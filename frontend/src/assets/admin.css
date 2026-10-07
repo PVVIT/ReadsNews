@@ -1,0 +1,118 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap') layer(base);
+@import 'tailwindcss';
+@source "../App.vue";
+@source "../components/**/*.vue";
+@source "../views/**/*.vue";
+
+@theme {
+    --font-sans: 'DM Sans', sans-serif;
+    --font-display: 'Manrope', sans-serif;
+    --color-brand-25: #f2f7ff;
+    --color-brand-50: #ecf3ff;
+    --color-brand-100: #dde9ff;
+    --color-brand-200: #c2d6ff;
+    --color-brand-300: #9cb9ff;
+    --color-brand-400: #7592ff;
+    --color-brand-500: #465fff;
+    --color-brand-600: #3641f5;
+    --color-brand-700: #2a31d8;
+    --color-brand-800: #252dae;
+    --color-brand-900: #262e89;
+    --color-brand-950: #161950;
+    --color-error-500: #f04438;
+    --text-title-sm: 30px;
+    --text-title-sm--line-height: 38px;
+    --text-title-md: 36px;
+    --text-title-md--line-height: 44px;
+    --shadow-theme-xs: 0px 1px 2px 0px rgba(16, 24, 40, 0.05);
+    --z-index-1: 1;
+    --color-forest-50: #edf5f0;
+    --color-forest-100: #d8e9dd;
+    --color-forest-200: #b4d2be;
+    --color-forest-300: #8db99d;
+    --color-forest-400: #619879;
+    --color-forest-500: #407b5d;
+    --color-forest-600: #2f654b;
+    --color-forest-700: #25523e;
+    --color-forest-800: #1f4234;
+    --color-forest-900: #1a372c;
+    --color-forest-950: #10271e;
+    --color-citrus-50: #f5f7e9;
+    --color-citrus-100: #eaf0d2;
+    --color-citrus-200: #d9e4ac;
+    --color-citrus-300: #c1d27f;
+    --color-citrus-400: #a9bf5d;
+    --color-citrus-500: #8fa642;
+    --color-citrus-600: #718632;
+    --color-citrus-700: #58682b;
+    --color-citrus-800: #485429;
+    --color-citrus-900: #3d4826;
+    --color-citrus-950: #202611;
+}
+
+@layer base {
+    * {
+        box-sizing: border-box;
+    }
+
+    html {
+        background: #f4f6f2;
+    }
+
+    body {
+        min-height: 100vh;
+        margin: 0;
+        background: #f4f6f2;
+        color: #1f2c24;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+        font: inherit;
+    }
+
+    button:not(:disabled) {
+        cursor: pointer;
+    }
+}
+
+@layer utilities {
+    .reader-nav-scroll {
+        scrollbar-width: none;
+    }
+
+    .reader-nav-scroll::-webkit-scrollbar {
+        display: none;
+    }
+
+    main table thead {
+        font-size: 0.75rem;
+        line-height: 1.25rem;
+    }
+
+    main table tbody td {
+        padding-block: 1rem;
+    }
+
+    main table .text-\[8px\] {
+        font-size: 0.6875rem;
+        line-height: 1rem;
+    }
+
+    main table .text-\[9px\] {
+        font-size: 0.75rem;
+        line-height: 1.125rem;
+    }
+
+    main table .text-\[10px\] {
+        font-size: 0.8125rem;
+        line-height: 1.25rem;
+    }
+
+    main table .text-\[11px\] {
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+    }
+}
