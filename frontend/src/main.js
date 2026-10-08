@@ -14,7 +14,14 @@ const RouterLinkCompat = defineComponent({
     to: { type: String, required: true },
   },
   setup(props, { attrs, slots }) {
-    return () => h('a', { ...attrs, href: props.to }, slots.default?.())
+    const handleClick = (e) => {
+      if (props.to && props.to.startsWith('/') && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+        e.preventDefault()
+        window.history.pushState({}, '', props.to)
+        window.dispatchEvent(new PopStateEvent('popstate'))
+      }
+    }
+    return () => h('a', { ...attrs, href: props.to, onClick: handleClick }, slots.default?.())
   },
 })
 
@@ -30,5 +37,6 @@ app.use(Vue3Toastify, {
 // Đăng ký custom directive v-role để kiểm tra quyền hạn giao diện
 app.directive('role', vRole)
 app.component('RouterLink', RouterLinkCompat)
+app.component('router-link', RouterLinkCompat)
 
 app.mount('#app')

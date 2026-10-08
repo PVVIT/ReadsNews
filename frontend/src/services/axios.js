@@ -12,7 +12,6 @@ const apiClient = axios.create({
   },
 })
 
-// 1. Request Interceptor: Gắn token & header
 apiClient.interceptors.request.use(
   (config) => {
     const token = auth.getToken()
@@ -26,13 +25,10 @@ apiClient.interceptors.request.use(
   }
 )
 
-// 2. Response Interceptor: Xử lý status 200, 401, 404, 422, 500
 apiClient.interceptors.response.use(
   (response) => {
     const { config, data, status } = response
 
-    // Tự động báo thành công cho các thao tác thay đổi dữ liệu (POST, PUT, PATCH, DELETE)
-    // hoặc khi request có flag notifySuccess: true
     const isMutation = ['post', 'put', 'patch', 'delete'].includes(config.method?.toLowerCase())
     if (config.notifySuccess || (isMutation && config.showSuccessToast !== false)) {
       const successMsg = data?.message || 'Thao tác thành công!'
@@ -47,11 +43,9 @@ apiClient.interceptors.response.use(
 
       switch (status) {
         case 401: {
-          // 401: Sai thông tin đăng nhập hoặc chưa đăng nhập
           const msg = data?.message || 'Sai thông tin đăng nhập: tài khoản hoặc mật khẩu không chính xác.'
           toast.error(msg)
 
-          // Nếu có token lưu nhưng bị 401, xóa auth để yêu cầu đăng nhập lại
           if (auth.isAuthenticated()) {
             auth.clearAuth()
           }
@@ -59,21 +53,18 @@ apiClient.interceptors.response.use(
         }
 
         case 403: {
-          // 403: Không có quyền truy cập (Role không đủ)
           const msg = data?.message || 'Bạn không có quyền thực hiện thao tác này.'
           toast.warning(msg)
           break
         }
 
         case 404: {
-          // 404: Trang hoặc tài nguyên không tồn tại
           const msg = data?.message || 'Trang hoặc tài nguyên yêu cầu không tồn tại (404).'
           toast.error(msg)
           break
         }
 
         case 422: {
-          // 422: Dữ liệu không hợp lệ (Validation errors)
           let errorDetails = ''
           if (data?.errors && typeof data.errors === 'object') {
             const errorList = Object.values(data.errors).flat()
@@ -85,7 +76,6 @@ apiClient.interceptors.response.use(
         }
 
         case 500: {
-          // 500: Lỗi máy chủ, thao tác thất bại
           const msg = data?.message || 'Máy chủ gặp sự cố, thao tác thất bại (500).'
           toast.error(msg)
           break

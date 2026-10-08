@@ -3,10 +3,14 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Mail\ResetPasswordMail;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
@@ -109,6 +113,90 @@ class AuthController extends Controller
                 'token_type' => 'Bearer',
             ],
         ], 200);
+    }
+
+    /**
+     * Gửi email liên kết khôi phục mật khẩu.
+     * POST /api/auth/forgot-password
+     */
+    public function forgotPassword(Request $request): JsonResponse
+    {
+        $request->validate([
+            'email' => 'required|email|exists:users,email',
+        ], [
+            'email.required' => 'Vui lòng nhập địa chỉ email.',
+            'email.email' => 'Email không đúng định dạng.',
+            'email.exists' => 'Không tìm thấy tài khoản với email này.',
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        // Tạo token bằng Password broker (tự động lưu vào password_reset_tokens)
+        $token = Password::broker()->createToken($user);
+
+        // Tạo URL đặt lại mật khẩu trỏ về frontend
+        $frontendUrl = rtrim(env('FRONTEND_URL', 'http://localhost:5173'), '/');
+        $resetUrl = "{$frontendUrl}/reset-password?token={$token}&email=" . urlencode($user->email);
+
+        try {
+            Mail::to($user->email)->send(new ResetPasswordMail($user->name, $resetUrl, $token));
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Không thể gửi email khôi phục: ' . $e->getMessage(),
+            ], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Email khôi phục mật khẩu đã được gửi! Vui lòng kiểm tra hộp thư của bạn.',
+        ], 200);
+    }
+
+    /**
+     * Đặt lại mật khẩu mới bằng token.
+     * POST /api/auth/reset-password
+     */
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $request->validate([
+            'email' => 'required|email|exists:users,email',
+            'token' => 'required|string',
+            'password' => 'required|string|min:6|confirmed',
+        ], [
+            'email.required' => 'Vui lòng cung cấp email.',
+            'email.email' => 'Email không đúng định dạng.',
+            'email.exists' => 'Không tìm thấy tài khoản với email này.',
+            'token.required' => 'Mã xác thực token không được để trống.',
+            'password.required' => 'Mật khẩu mới không được để trống.',
+            'password.min' => 'Mật khẩu phải có ít nhất 6 ký tự.',
+            'password.confirmed' => 'Xác nhận mật khẩu mới không trùng khớp.',
+        ]);
+
+        $status = Password::broker()->reset(
+            $request->only('email', 'password', 'password_confirmation', 'token'),
+            function ($user, string $password) {
+                $user->forceFill([
+                    'password' => Hash::make($password),
+                ])->setRememberToken(Str::random(60));
+                $user->save();
+
+                // Hủy tất cả access tokens cũ để bảo mật
+                $user->tokens()->delete();
+            }
+        );
+
+        if ($status === Password::PASSWORD_RESET) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Đặt lại mật khẩu thành công! Bạn có thể đăng nhập ngay.',
+            ], 200);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Mã xác thực token không hợp lệ hoặc đã hết hạn.',
+        ], 400);
     }
 
     /**

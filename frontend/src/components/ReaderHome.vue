@@ -1,334 +1,1033 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { auth } from '@/utils/auth'
+import { authService } from '@/services/authService'
+import { toast } from 'vue3-toastify'
 
-const categories = ['Tất cả', 'Thời sự', 'Thế giới', 'Kinh doanh', 'Thể thao', 'Công nghệ']
+const categories = ['Tất cả', 'Thời sự', 'Thế giới', 'Kinh doanh', 'Thể thao', 'Công nghệ', 'Đời sống']
+
 const articles = [
-    { id: 1, category: 'Thời sự', source: 'Nhịp sống Việt', time: '12 phút trước', minutes: 6, author: 'Minh Anh', views: 12540, title: 'Những thành phố đang thay đổi cách chúng ta di chuyển', summary: 'Từ giao thông công cộng đến những tuyến phố ưu tiên người đi bộ, nhiều đô thị đang thử nghiệm một nhịp sống ít phụ thuộc vào xe cá nhân hơn.', image: '/images/home/city.png', body: 'Các đô thị lớn đang nhìn lại cách không gian đường phố được phân chia. Thay vì dành phần lớn diện tích cho phương tiện cá nhân, nhiều kế hoạch mới ưu tiên kết nối giao thông công cộng, lối đi bộ và không gian xanh.\n\nSự chuyển dịch này không diễn ra trong một sớm một chiều. Những thay đổi nhỏ như mở rộng vỉa hè, tổ chức lại điểm trung chuyển và bổ sung dữ liệu giao thông theo thời gian thực đang giúp người dân có thêm lựa chọn cho hành trình hằng ngày.\n\nGiới quy hoạch cho rằng thành công của các thử nghiệm sẽ phụ thuộc vào khả năng kết nối giữa khu dân cư, nơi làm việc và dịch vụ thiết yếu.' },
-    { id: 2, category: 'Công nghệ', source: 'Dữ liệu Mở', time: '35 phút trước', minutes: 4, author: 'Hoàng Long', views: 9360, title: 'Văn phòng linh hoạt đang định hình lại ngày làm việc', summary: 'Không gian làm việc mới kết hợp khu cộng tác, phòng yên tĩnh và lịch làm việc linh động để phù hợp với từng nhóm.', image: '/images/home/office.png', body: 'Nhiều tổ chức đang thiết kế lại văn phòng theo hướng linh hoạt hơn. Thay vì một chỗ ngồi cố định cho mọi nhân viên, không gian được chia theo nhu cầu: khu cộng tác, phòng tập trung và các điểm gặp nhanh.\n\nCách làm này đặt ra yêu cầu mới về công nghệ đặt chỗ, quyền riêng tư và thói quen phối hợp. Hiệu quả phụ thuộc nhiều vào quy ước làm việc rõ ràng, không chỉ vào thiết kế nội thất.' },
-    { id: 3, category: 'Đời sống', source: 'Tạp chí Cuối Tuần', time: '1 giờ trước', minutes: 5, author: 'Thu Hà', views: 7210, title: 'Một khoảng nghỉ ngắn có thể giúp ngày làm việc nhẹ hơn', summary: 'Những cách đơn giản để tạo nhịp nghỉ hợp lý giữa lịch làm việc dày đặc.', image: '/images/home/work.png', body: 'Những khoảng nghỉ ngắn giúp nhiều người lấy lại sự tập trung sau các phiên làm việc liên tục. Một vòng đi bộ, vài phút rời màn hình hoặc một cuộc trò chuyện ngắn đều có thể tạo điểm ngắt cần thiết.\n\nĐiều quan trọng là lựa chọn cách nghỉ phù hợp với công việc và duy trì lịch nghỉ như một phần bình thường của ngày làm việc.' },
-    { id: 4, category: 'Kinh doanh', source: 'Bản tin Thị trường', time: '2 giờ trước', minutes: 7, author: 'Quốc Bảo', views: 5120, title: 'Doanh nghiệp tìm hướng phát triển không gian xanh', summary: 'Nhu cầu tiết kiệm năng lượng và nâng chất lượng môi trường đang thúc đẩy những tiêu chuẩn mới cho công trình.', image: '/images/home/spaces.png', body: 'Các chủ đầu tư đang quan tâm nhiều hơn đến hiệu suất năng lượng và chất lượng môi trường bên trong công trình. Những tiêu chuẩn thiết kế mới khuyến khích tận dụng ánh sáng tự nhiên, lựa chọn vật liệu bền vững và theo dõi mức tiêu thụ năng lượng.\n\nBài toán nằm ở việc cân bằng chi phí ban đầu với hiệu quả vận hành trong dài hạn.' },
-    { id: 5, category: 'Thế giới', source: 'Góc nhìn Toàn cầu', time: '3 giờ trước', minutes: 5, author: 'Hải Yến', views: 4380, title: 'Các đô thị ven biển chuẩn bị cho mùa mưa lớn', summary: 'Nhiều địa phương đang kết hợp dữ liệu thời tiết với quy hoạch hạ tầng để giảm rủi ro ngập lụt.', image: '/images/home/city.png', body: 'Các đô thị ven biển đang cập nhật kế hoạch ứng phó với những đợt mưa lớn và triều cường. Dữ liệu thời tiết theo khu vực giúp cơ quan quản lý chủ động điều phối giao thông, vận hành hệ thống thoát nước và thông tin đến cư dân.\n\nCác chuyên gia nhấn mạnh rằng hạ tầng xanh và quy hoạch dài hạn cần song hành với cảnh báo sớm.' },
+  {
+    id: 1,
+    category: 'Thời sự',
+    source: 'Nhịp sống Việt',
+    time: '12 phút trước',
+    minutes: 6,
+    author: 'Minh Anh',
+    views: 12540,
+    title: 'Những đô thị thông minh đang thay đổi cách chúng ta di chuyển hằng ngày',
+    summary: 'Từ mạng lưới xe buýt điện, tàu cao tốc đô thị đến các tuyến phố ưu tiên người đi bộ, nhiều thành phố đang mở ra phong cách sống xanh và tiện nghi hơn.',
+    aiSummary: '• Ưu tiên giao thông công cộng và kết nối xanh thay vì phát triển xe cá nhân.\n• Ứng dụng bản đồ dữ liệu thời gian thực giúp giảm 35% thời gian chờ đợi.\n• Thử nghiệm phố đi bộ và mở rộng vỉa hè nâng cao chất lượng không gian sống đô thị.',
+    image: '/images/home/city.png',
+    voice: 'Google WaveNet Nữ (vi-VN)',
+    body: 'Các đô thị lớn đang nhìn lại cách không gian đường phố được phân chia. Thay vì dành phần lớn diện tích cho phương tiện cá nhân, nhiều kế hoạch mới ưu tiên kết nối giao thông công cộng, lối đi bộ và không gian xanh.\n\nSự chuyển dịch này không diễn ra trong một sớm một chiều. Những thay đổi nhỏ như mở rộng vỉa hè, tổ chức lại điểm trung chuyển và bổ sung dữ liệu giao thông theo thời gian thực đang giúp người dân có thêm lựa chọn cho hành trình hằng ngày.\n\nGiới quy hoạch cho rằng thành công của các thử nghiệm sẽ phụ thuộc vào khả năng kết nối giữa khu dân cư, nơi làm việc và dịch vụ thiết yếu, mang đến trải nghiệm di chuyển liền mạch và bảo vệ môi trường.',
+  },
+  {
+    id: 2,
+    category: 'Công nghệ',
+    source: 'Dữ liệu Mở',
+    time: '35 phút trước',
+    minutes: 4,
+    author: 'Hoàng Long',
+    views: 9360,
+    title: 'Mô hình văn phòng linh hoạt kết hợp AI đang định hình lại ngày làm việc',
+    summary: 'Không gian làm việc mới tích hợp trợ lý AI, phòng tập trung yên tĩnh và lịch làm việc linh động đang tối ưu hóa năng suất cho nhân sự số.',
+    aiSummary: '• Doanh nghiệp chuyển đổi sang không gian làm việc phân vùng linh hoạt theo dự án.\n• Trợ lý AI hỗ trợ tự động hóa ghi chú cuộc họp và điều phối lịch làm việc.\n• Năng suất lao động tăng 28% khi nhân viên được chủ động chọn nhịp độ làm việc.',
+    image: '/images/home/office.png',
+    voice: 'Google WaveNet Nam (vi-VN)',
+    body: 'Nhiều tổ chức đang thiết kế lại văn phòng theo hướng linh hoạt hơn. Thay vì một chỗ ngồi cố định cho mọi nhân viên, không gian được chia theo nhu cầu: khu cộng tác, phòng tập trung và các điểm gặp nhanh.\n\nCách làm này đặt ra yêu cầu mới về công nghệ đặt chỗ, quyền riêng tư và thói quen phối hợp. Hiệu quả phụ thuộc nhiều vào quy ước làm việc rõ ràng, không chỉ vào thiết kế nội thất.',
+  },
+  {
+    id: 3,
+    category: 'Đời sống',
+    source: 'Tạp chí Cuối Tuần',
+    time: '1 giờ trước',
+    minutes: 5,
+    author: 'Thu Hà',
+    views: 7210,
+    title: 'Nghệ thuật ngắt nhịp: Một khoảng nghỉ ngắn giúp phục hồi năng lượng tư duy',
+    summary: 'Những phương pháp khoa học đơn giản để tạo điểm ngắt nhịp lý tưởng giữa lịch trình làm việc căng thẳng mà không làm gián đoạn hiệu suất.',
+    aiSummary: '• Áp dụng chu kỳ làm việc 50 phút tập trung kết hợp 10 phút thả lỏng mắt và vận động nhẹ.\n• Giảm 40% tình trạng kiệt sức kỹ thuật số (digital fatigue) khi rời màn hình định kỳ.\n• Duy trì năng lượng ổn định suốt cả ngày mà không cần lạm dụng caffeine.',
+    image: '/images/home/work.png',
+    voice: 'Google WaveNet Nữ (vi-VN)',
+    body: 'Những khoảng nghỉ ngắn giúp nhiều người lấy lại sự tập trung sau các phiên làm việc liên tục. Một vòng đi bộ, vài phút rời màn hình hoặc một cuộc trò chuyện ngắn đều có thể tạo điểm ngắt cần thiết.\n\nĐiều quan trọng là lựa chọn cách nghỉ phù hợp với công việc và duy trì lịch nghỉ như một phần bình thường của ngày làm việc.',
+  },
+  {
+    id: 4,
+    category: 'Kinh doanh',
+    source: 'Bản tin Thị trường',
+    time: '2 giờ trước',
+    minutes: 7,
+    author: 'Quốc Bảo',
+    views: 5120,
+    title: 'Xu hướng đầu tư công trình bền vững và bài toán tiết kiệm năng lượng dài hạn',
+    summary: 'Tiêu chuẩn xanh không còn là khẩu hiệu mà đang trở thành thước đo giá trị cốt lõi giúp các tập đoàn tối ưu hóa chi phí vận hành 20 năm tới.',
+    aiSummary: '• Tiêu chuẩn LEED & Lotus giúp giảm tới 30% hóa đơn tiền điện và nước của tòa nhà.\n• Nhu cầu thuê văn phòng xanh tăng mạnh từ các công ty đa quốc gia có cam kết ESG.\n• Bài toán hoàn vốn đầu tư công nghệ xanh rút ngắn xuống còn 4-6 năm.',
+    image: '/images/home/spaces.png',
+    voice: 'Google WaveNet Nam (vi-VN)',
+    body: 'Các chủ đầu tư đang quan tâm nhiều hơn đến hiệu suất năng lượng và chất lượng môi trường bên trong công trình. Những tiêu chuẩn thiết kế mới khuyến khích tận dụng ánh sáng tự nhiên, lựa chọn vật liệu bền vững và theo dõi mức tiêu thụ năng lượng.\n\nBài toán nằm ở việc cân bằng chi phí ban đầu với hiệu quả vận hành trong dài hạn.',
+  },
+  {
+    id: 5,
+    category: 'Thế giới',
+    source: 'Góc nhìn Toàn cầu',
+    time: '3 giờ trước',
+    minutes: 5,
+    author: 'Hải Yến',
+    views: 4380,
+    title: 'Các siêu đô thị ven biển ứng dụng AI dự báo để chủ động thích ứng biến đổi khí hậu',
+    summary: 'Mô hình học máy kết hợp mạng lưới cảm biến IoT đang giúp các thành phố ven biển phát cảnh báo sớm ngập lụt trước 48 giờ.',
+    aiSummary: '• Mạng lưới cảm biến vệ tinh & IoT cung cấp dữ liệu thủy triều và vũ lượng chính xác từng mét vuông.\n• Hệ thống đê kè thông minh tự động đóng mở giảm thiểu rủi ro cho khu dân cư trũng thấp.\n• Hợp tác chia sẻ dữ liệu khí hậu xuyên biên giới đạt cột mốc mới.',
+    image: '/images/home/city.png',
+    voice: 'Google WaveNet Nữ (vi-VN)',
+    body: 'Các đô thị ven biển đang cập nhật kế hoạch ứng phó với những đợt mưa lớn và triều cường. Dữ liệu thời tiết theo khu vực giúp cơ quan quản lý chủ động điều phối giao thông, vận hành hệ thống thoát nước và thông tin đến cư dân.\n\nCác chuyên gia nhấn mạnh rằng hạ tầng xanh và quy hoạch dài hạn cần song hành với cảnh báo sớm.',
+  },
 ]
 
+// Trạng thái ứng dụng
 const activeCategory = ref('Tất cả')
-const activeView = ref('latest')
+const activeView = ref('latest') // 'latest' | 'popular' | 'saved'
 const searchQuery = ref('')
 const savedIds = ref(readSavedIds())
 const selectedArticle = ref(null)
-const speechRate = ref(1)
-const playingId = ref(null)
 const notice = ref('')
-const pageReady = ref(false)
-let noticeTimer
+let noticeTimer = null
+
+// Trình phát âm thanh
+const playingId = ref(null)
+const activePlayingArticle = ref(null)
+const isPaused = ref(false)
+const speechRate = ref(1)
+const playbackProgress = ref(0)
+let progressInterval = null
+
 const featuredArticle = articles[0]
-const readerName = computed(() => localStorage.getItem('auth_user') ? JSON.parse(localStorage.getItem('auth_user')).name?.split(' ').at(-1) || 'bạn đọc' : 'bạn đọc')
-const playerStatus = computed(() => playingId.value ? 'Đang đọc bài viết' : 'Sẵn sàng phát')
-const feedTitle = computed(() => {
-    if (activeView.value === 'saved') return 'Bài viết đã lưu'
-    if (activeView.value === 'popular') return 'Được quan tâm'
-    return activeCategory.value === 'Tất cả' ? 'Tin mới nhất' : activeCategory.value
+
+// User Auth info
+const currentUser = computed(() => auth.getUser())
+const readerName = computed(() => {
+  if (currentUser.value?.name) {
+    return currentUser.value.name.split(' ').at(-1)
+  }
+  return 'bạn đọc'
 })
+
+// Tiêu đề danh sách
+const feedTitle = computed(() => {
+  if (activeView.value === 'saved') return 'Bài viết đã lưu'
+  if (activeView.value === 'popular') return 'Được quan tâm nhất'
+  return activeCategory.value === 'Tất cả' ? 'Tin mới cập nhật' : `Chuyên mục: ${activeCategory.value}`
+})
+
+// Lọc bài viết
 const filteredArticles = computed(() => {
-    let result = articles.filter((article) => article.id !== featuredArticle.id)
-    if (activeView.value === 'saved') result = articles.filter((article) => savedIds.value.includes(article.id))
-    if (activeCategory.value !== 'Tất cả') result = result.filter((article) => article.category === activeCategory.value)
-    const query = searchQuery.value.trim().toLocaleLowerCase('vi')
-    if (query) result = result.filter((article) => `${article.title} ${article.summary} ${article.source}`.toLocaleLowerCase('vi').includes(query))
-    if (activeView.value === 'popular') result = [...result].sort((a, b) => b.views - a.views)
-    return result
+  let list = articles.filter((a) => a.id !== featuredArticle.id)
+
+  if (activeView.value === 'saved') {
+    list = articles.filter((a) => savedIds.value.includes(a.id))
+  }
+
+  if (activeCategory.value !== 'Tất cả') {
+    list = list.filter((a) => a.category === activeCategory.value)
+  }
+
+  const query = searchQuery.value.trim().toLocaleLowerCase('vi')
+  if (query) {
+    list = list.filter((a) => `${a.title} ${a.summary} ${a.source} ${a.author}`.toLocaleLowerCase('vi').includes(query))
+  }
+
+  if (activeView.value === 'popular') {
+    list = [...list].sort((a, b) => b.views - a.views)
+  }
+
+  return list
 })
 
 function readSavedIds() {
-    try {
-        return JSON.parse(localStorage.getItem('readsnews_saved') || '[]')
-    } catch {
-        return []
-    }
+  try {
+    return JSON.parse(localStorage.getItem('readsnews_saved') || '[]')
+  } catch {
+    return []
+  }
 }
-watch(savedIds, (value) => localStorage.setItem('readsnews_saved', JSON.stringify(value)), { deep: true })
-onMounted(() => requestAnimationFrame(() => { pageReady.value = true }))
+
+watch(
+  savedIds,
+  (val) => {
+    localStorage.setItem('readsnews_saved', JSON.stringify(val))
+  },
+  { deep: true },
+)
+
 function toggleSaved(article) {
-    savedIds.value = savedIds.value.includes(article.id) ? savedIds.value.filter((id) => id !== article.id) : [...savedIds.value, article.id]
+  if (savedIds.value.includes(article.id)) {
+    savedIds.value = savedIds.value.filter((id) => id !== article.id)
+    notify('Đã xóa khỏi danh sách lưu trữ')
+  } else {
+    savedIds.value.push(article.id)
+    notify('Đã lưu bài viết vào thư viện cá nhân ✨')
+  }
 }
-function setCategory(category) {
-    activeCategory.value = category
-    activeView.value = 'latest'
+
+function setCategory(cat) {
+  activeCategory.value = cat
+  activeView.value = 'latest'
 }
-function notify(message) {
-    notice.value = message
-    window.clearTimeout(noticeTimer)
-    noticeTimer = window.setTimeout(() => { notice.value = '' }, 2600)
+
+function notify(msg) {
+  notice.value = msg
+  clearTimeout(noticeTimer)
+  noticeTimer = setTimeout(() => {
+    notice.value = ''
+  }, 2800)
 }
+
+// Xử lý đọc văn bản SpeechSynthesis
 function toggleSpeech(article) {
-    if (!('speechSynthesis' in window)) return notify('Trình duyệt này chưa hỗ trợ đọc thành tiếng.')
-    if (playingId.value === article.id) {
-        window.speechSynthesis.cancel()
-        playingId.value = null
-        return
+  if (!('speechSynthesis' in window)) {
+    return notify('Trình duyệt của bạn chưa hỗ trợ Web Speech API.')
+  }
+
+  // Đang nghe bài này -> Bấm để tạm dừng hoặc tiếp tục
+  if (playingId.value === article.id) {
+    if (window.speechSynthesis.paused) {
+      window.speechSynthesis.resume()
+      isPaused.value = false
+    } else if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.pause()
+      isPaused.value = true
+    } else {
+      stopSpeech()
     }
-    window.speechSynthesis.cancel()
-    const utterance = new SpeechSynthesisUtterance(`${article.title}. ${article.summary}. ${article.body}`)
-    utterance.lang = 'vi-VN'
-    utterance.rate = speechRate.value
-    utterance.onend = utterance.onerror = () => { playingId.value = null }
-    playingId.value = article.id
-    window.speechSynthesis.speak(utterance)
+    return
+  }
+
+  // Chuyển sang đọc bài mới
+  stopSpeech()
+  activePlayingArticle.value = article
+  playingId.value = article.id
+  isPaused.value = false
+  playbackProgress.value = 5
+
+  const textToRead = `${article.title}. Tóm tắt. ${article.summary}. Nội dung chi tiết. ${article.body}`
+  const utterance = new SpeechSynthesisUtterance(textToRead)
+  utterance.lang = 'vi-VN'
+  utterance.rate = speechRate.value
+
+  // Giả lập thanh tiến trình phát dựa theo độ dài bài
+  const estSeconds = Math.max(article.minutes * 60, 60)
+  const step = 100 / estSeconds
+  progressInterval = setInterval(() => {
+    if (!isPaused.value && playbackProgress.value < 96) {
+      playbackProgress.value = Math.min(playbackProgress.value + step, 96)
+    }
+  }, 1000)
+
+  utterance.onend = () => {
+    playbackProgress.value = 100
+    setTimeout(() => {
+      stopSpeech()
+    }, 800)
+  }
+
+  utterance.onerror = () => {
+    stopSpeech()
+  }
+
+  window.speechSynthesis.speak(utterance)
+  notify(`Đang phát: ${article.title}`)
 }
+
+function stopSpeech() {
+  if ('speechSynthesis' in window) {
+    window.speechSynthesis.cancel()
+  }
+  playingId.value = null
+  isPaused.value = false
+  clearInterval(progressInterval)
+  playbackProgress.value = 0
+}
+
+function changeSpeed(rate) {
+  speechRate.value = rate
+  if (playingId.value && activePlayingArticle.value) {
+    // Khởi động lại với tốc độ mới
+    toggleSpeech(activePlayingArticle.value)
+    toggleSpeech(activePlayingArticle.value)
+  }
+  notify(`Tốc độ đọc: ${rate}x`)
+}
+
+const showLogoutModal = ref(false)
+
+function handleLogout() {
+  showLogoutModal.value = true
+}
+
+async function confirmLogout() {
+  try {
+    await authService.logout()
+  } catch (e) {
+    // Không gián đoạn nếu network có lỗi
+  }
+  auth.clearAuth()
+  showLogoutModal.value = false
+  toast.success('Đã đăng xuất tài khoản thành công!', {
+    autoClose: 2000,
+  })
+  setTimeout(() => {
+    window.location.reload()
+  }, 1000)
+}
+
 onBeforeUnmount(() => {
-    if ('speechSynthesis' in window) window.speechSynthesis.cancel()
-    window.clearTimeout(noticeTimer)
+  stopSpeech()
+  clearTimeout(noticeTimer)
 })
 </script>
 
 <template>
-    <div :class="['min-h-screen bg-[#f4f6f2] text-gray-800 transition-transform duration-500 ease-out motion-reduce:transition-none', pageReady ? 'translate-y-0' : 'translate-y-2']">
-        <header class="sticky top-0 z-30 border-b border-white/10 bg-forest-950 text-white shadow-sm">
-            <div class="mx-auto flex min-h-[72px] max-w-[1500px] items-center gap-3 px-3 sm:gap-5 sm:px-6 xl:px-9">
-                <a href="/"
-                    class="flex shrink-0 items-center gap-2 font-display text-lg font-extrabold tracking-tight sm:text-xl">
-                    <span class="grid size-9 place-items-center rounded-lg bg-citrus-300 text-forest-950"><svg
-                            class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                            <path d="M5 19V9m7 10V5m7 14v-7" />
-                        </svg></span>
-                    Reads<span class="-ms-2 text-citrus-300">News</span>
-                </a>
-                <label
-                    class="flex h-10 min-w-0 max-w-xl flex-1 items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 text-white focus-within:border-citrus-300 focus-within:bg-white/15">
-                    <svg class="size-4 shrink-0 text-white/55" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="1.8" stroke-linecap="round">
-                        <circle cx="10.8" cy="10.8" r="6.5" />
-                        <path d="m16 16 4 4" />
-                    </svg>
-                    <input v-model="searchQuery"
-                        class="w-full border-0 bg-transparent p-0 text-sm text-white outline-none placeholder:text-white/50 focus:ring-0"
-                        placeholder="Tìm bài viết..." aria-label="Tìm kiếm bài viết" />
-                    <kbd
-                        class="hidden rounded border border-white/20 px-1.5 py-0.5 text-xs text-white/50 sm:block">/</kbd>
-                </label>
-                <span class="ms-auto hidden shrink-0 text-sm text-white/70 xl:block">Xin chào, {{
-                    readerName }}</span>
-                <a href="/signin"
-                    class="shrink-0 rounded-lg px-2 py-2 text-xs font-semibold text-white/80 transition hover:bg-white/10 hover:text-white sm:px-3 sm:text-sm">Đăng nhập</a>
-                <a href="/admin"
-                    class="shrink-0 rounded-lg border border-white/25 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/10 sm:px-4 sm:text-sm">Quản
-                    trị</a>
-            </div>
-            <nav class="reader-nav-scroll mx-auto flex max-w-[1500px] items-center gap-1 overflow-x-auto border-t border-white/10 px-3 py-2 sm:px-6 xl:px-9"
-                aria-label="Điều hướng tin tức">
-                <button
-                    :class="['shrink-0 rounded-md px-3 py-2 text-xs font-semibold transition sm:text-sm', activeView === 'latest' ? 'bg-white/15 text-white' : 'text-white/65 hover:bg-white/10 hover:text-white']"
-                    @click="activeView = 'latest'; activeCategory = 'Tất cả'">Dành cho bạn</button>
-                <button
-                    :class="['shrink-0 rounded-md px-3 py-2 text-xs font-semibold transition sm:text-sm', activeView === 'popular' ? 'bg-white/15 text-white' : 'text-white/65 hover:bg-white/10 hover:text-white']"
-                    @click="activeView = 'popular'; activeCategory = 'Tất cả'">Phổ biến</button>
-                <button
-                    :class="['shrink-0 rounded-md px-3 py-2 text-xs font-semibold transition sm:text-sm', activeView === 'saved' ? 'bg-white/15 text-white' : 'text-white/65 hover:bg-white/10 hover:text-white']"
-                    @click="activeView = 'saved'; activeCategory = 'Tất cả'">Đã lưu <span
-                        class="ms-1 text-citrus-200">{{ savedIds.length }}</span></button>
-                <span class="mx-2 h-5 w-px shrink-0 bg-white/20" aria-hidden="true"></span>
-                <button v-for="category in categories" :key="category"
-                    :class="['shrink-0 rounded-md px-3 py-2 text-xs font-medium transition sm:text-sm', activeCategory === category ? 'bg-citrus-200 text-forest-950' : 'text-white/65 hover:bg-white/10 hover:text-white']"
-                    @click="setCategory(category)">{{ category }}</button>
-            </nav>
-        </header>
+  <div class="min-h-screen bg-slate-50 text-slate-800 font-sans selection:bg-indigo-500 selection:text-white">
+    <!-- 1. TOP NAVBAR -->
+    <header
+      class="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200/80 transition-all duration-200 shadow-xs">
+      <div class="mx-auto flex h-18 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
 
-        <div class="min-w-0">
+        <!-- Logo -->
+        <a href="/" class="group flex shrink-0 items-center gap-2.5">
+          <div
+            class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/20 group-hover:scale-105 transition-transform duration-200">
+            <!-- Soundwave AI Icon -->
+            <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2 10v4" />
+              <path d="M6 7v10" />
+              <path d="M10 4v16" />
+              <path d="M14 7v10" />
+              <path d="M18 10v4" />
+              <path d="M22 12v0" />
+            </svg>
+          </div>
+          <div class="flex flex-col">
+            <span
+              class="text-lg font-black tracking-tight text-slate-900 group-hover:text-indigo-600 transition-colors">
+              Reads<span class="text-indigo-600">News</span>
+            </span>
+            <span
+              class="text-[10px] font-semibold tracking-wider text-indigo-500 uppercase -mt-1 flex items-center gap-1">
+              <span class="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              AI Audio Reader
+            </span>
+          </div>
+        </a>
 
-            <main class="mx-auto max-w-[1500px] px-4 py-6 sm:px-7 sm:py-8 xl:px-9">
-                <section class="mb-7 flex flex-wrap items-end justify-between gap-4">
-                    <div>
-                        <p
-                            class="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[.14em] text-forest-700">
-                            <i class="size-2 rounded-full bg-citrus-500"></i>BẢN TIN CỦA BẠN
-                        </p>
-                        <h1 class="font-display text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Tin mới,
-                            góc nhìn mới<span class="text-forest-500">.</span></h1>
-                        <p class="mt-2 max-w-2xl text-sm leading-6 text-gray-500">Những câu chuyện đáng đọc hôm nay,
-                            được chọn lọc để bạn nắm bắt thế giới theo nhịp riêng.</p>
-                    </div>
-                    <div class="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
-                        <span
-                            class="grid size-10 place-items-center rounded-lg bg-citrus-50 text-xl text-forest-700">♫</span><span><strong
-                                class="block text-sm font-bold text-gray-800">Nghe tin theo cách bạn
-                                thích</strong><small class="text-xs text-gray-500">Bật đọc thành tiếng trên mỗi bài
-                                viết</small></span>
-                    </div>
-                </section>
-
-                <section class="grid gap-4 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,.8fr)]"
-                    aria-label="Tin nổi bật và danh sách nghe">
-                    <article
-                        class="relative flex min-h-[430px] overflow-hidden rounded-2xl bg-forest-950 text-white sm:min-h-[460px]">
-                        <img class="absolute inset-0 size-full object-cover" :src="featuredArticle.image"
-                            :alt="`Ảnh minh họa: ${featuredArticle.title}`" />
-                        <div
-                            class="absolute inset-0 bg-gradient-to-r from-forest-950/90 via-forest-950/65 to-forest-950/10">
-                        </div>
-                        <div class="relative z-10 flex max-w-2xl flex-col justify-end p-6 sm:p-9">
-                            <div class="flex items-center gap-3 text-xs font-semibold text-white/75"><span
-                                    class="rounded-md border border-white/30 bg-white/10 px-2.5 py-1.5 text-citrus-100">{{
-                                        featuredArticle.category }}</span><span>{{ featuredArticle.time }}</span></div>
-                            <h2 class="mt-5 max-w-xl font-display text-3xl font-bold leading-tight sm:text-4xl">{{
-                                featuredArticle.title }}</h2>
-                            <p class="mt-4 max-w-xl text-sm leading-6 text-white/80">{{ featuredArticle.summary }}</p>
-                            <div class="mt-6 flex flex-wrap items-center gap-3"><button
-                                    class="inline-flex h-11 items-center gap-3 rounded-lg bg-citrus-200 px-4 text-sm font-bold text-forest-950 transition hover:bg-citrus-100"
-                                    @click="selectedArticle = featuredArticle">Đọc bài <span
-                                        aria-hidden="true">↗</span></button><button
-                                    class="grid size-11 place-items-center rounded-lg border border-white/35 bg-white/10 text-white transition hover:bg-white/20"
-                                    :aria-label="playingId === featuredArticle.id ? 'Dừng đọc' : 'Nghe bài viết'"
-                                    @click="toggleSpeech(featuredArticle)">{{ playingId === featuredArticle.id ? 'Ⅱ' :
-                                        '▶' }}</button><button
-                                    :class="['grid size-11 place-items-center rounded-lg border border-white/35 text-lg transition hover:bg-white/20', savedIds.includes(featuredArticle.id) ? 'bg-citrus-200 text-forest-950' : 'bg-white/10 text-white']"
-                                    :aria-label="savedIds.includes(featuredArticle.id) ? 'Bỏ lưu bài viết' : 'Lưu bài viết'"
-                                    @click="toggleSaved(featuredArticle)">♧</button><span
-                                    class="ms-auto text-xs text-white/70">{{ featuredArticle.minutes }} phút đọc · {{
-                                        featuredArticle.author }}</span></div>
-                        </div><span
-                            class="absolute end-5 top-5 rounded-full border border-white/20 bg-forest-950/40 px-3 py-1.5 text-xs font-semibold text-white/80">BÀI
-                            NỔI BẬT</span>
-                    </article>
-
-                    <aside class="flex flex-col rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
-                        <div class="flex items-start justify-between gap-4">
-                            <div>
-                                <p class="text-xs font-bold uppercase tracking-[.14em] text-forest-600">NGHE TIN</p>
-                                <h2 class="mt-2 font-display text-xl font-bold text-gray-900">Vừa đủ để cập nhật</h2>
-                            </div><span class="flex h-8 items-center gap-1" aria-hidden="true"><i
-                                    class="h-2 w-1 rounded-full bg-citrus-400"></i><i
-                                    class="h-4 w-1 rounded-full bg-citrus-500"></i><i
-                                    class="h-6 w-1 rounded-full bg-forest-500"></i><i
-                                    class="h-4 w-1 rounded-full bg-citrus-500"></i><i
-                                    class="h-2 w-1 rounded-full bg-citrus-400"></i></span>
-                        </div>
-                        <p class="mt-3 text-sm leading-6 text-gray-500">Chọn tốc độ đọc phù hợp, để ReadsNews kể bạn
-                            nghe.</p>
-                        <div class="mt-4 flex items-center justify-between border-y border-gray-100 py-3"><span
-                                class="text-sm text-gray-600">Tốc độ đọc</span>
-                            <div class="flex rounded-lg bg-gray-100 p-1" role="group" aria-label="Tốc độ đọc"><button
-                                    v-for="speed in [0.8, 1, 1.2]" :key="speed"
-                                    :class="['rounded-md px-2.5 py-1.5 text-xs font-semibold', speechRate === speed ? 'bg-white text-forest-800 shadow-sm' : 'text-gray-500']"
-                                    @click="speechRate = speed">{{ speed }}x</button></div>
-                        </div>
-                        <p class="mb-2 mt-5 text-xs font-bold uppercase tracking-wider text-gray-400">Gợi ý tiếp theo
-                            <span class="float-end">03 BÀI</span>
-                        </p><button v-for="article in articles.slice(1, 4)" :key="article.id"
-                            class="flex min-h-[68px] items-center gap-3 border-b border-gray-100 text-start last:border-0"
-                            @click="toggleSpeech(article)"><span
-                                class="grid size-9 shrink-0 place-items-center rounded-full border border-gray-200 text-xs text-forest-700">{{
-                                    playingId === article.id ? 'Ⅱ' : '▶' }}</span><span class="min-w-0"><strong
-                                    class="block line-clamp-2 text-sm font-semibold leading-5 text-gray-800">{{
-                                        article.title }}</strong><small class="mt-1 block text-xs text-gray-500">{{
-                                        article.source }} · {{ article.minutes }} phút</small></span></button>
-                        <div class="mt-auto pt-3">
-                            <div class="h-1.5 overflow-hidden rounded-full bg-gray-100"><span
-                                    class="block h-full rounded-full bg-forest-500 transition-all"
-                                    :class="playingId ? 'w-2/5' : 'w-[8%]'"></span></div>
-                            <p class="mt-2 flex justify-between text-xs text-gray-500"><span>{{ playerStatus
-                                    }}</span><span>{{ speechRate }}x</span></p>
-                        </div>
-                    </aside>
-                </section>
-
-                <section class="mt-10">
-                    <div class="mb-5 flex flex-wrap items-end justify-between gap-4">
-                        <div>
-                            <p class="text-xs font-bold uppercase tracking-[.14em] text-forest-600">ĐỌC THEO NHỊP CỦA
-                                BẠN</p>
-                            <h2 class="mt-2 font-display text-2xl font-bold text-gray-900">{{ feedTitle }}</h2>
-                        </div>
-                        <div class="flex gap-2"><button
-                                :class="['rounded-lg px-4 py-2.5 text-sm font-semibold transition', activeView === 'latest' ? 'bg-forest-900 text-white' : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-50']"
-                                @click="activeView = 'latest'">Mới nhất</button><button
-                                :class="['rounded-lg px-4 py-2.5 text-sm font-semibold transition', activeView === 'popular' ? 'bg-forest-900 text-white' : 'border border-gray-200 bg-white text-gray-600 hover:bg-gray-50']"
-                                @click="activeView = 'popular'">Phổ biến</button></div>
-                    </div>
-                    <div class="mb-5 hidden flex-wrap gap-2 lg:flex"><button v-for="category in categories"
-                            :key="category"
-                            :class="['rounded-full px-4 py-2 text-sm font-medium transition', activeCategory === category ? 'bg-forest-100 text-forest-900' : 'bg-white text-gray-600 hover:bg-gray-100']"
-                            @click="setCategory(category)">{{ category }}</button></div>
-                    <div v-if="filteredArticles.length" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                        <article v-for="article in filteredArticles" :key="article.id"
-                            class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-                            <button class="group relative block h-48 w-full overflow-hidden bg-forest-100 text-start"
-                                :aria-label="`Đọc bài: ${article.title}`" @click="selectedArticle = article"><img
-                                    class="size-full object-cover transition duration-500 group-hover:scale-105"
-                                    :src="article.image" :alt="`Ảnh minh họa: ${article.title}`" loading="lazy" /><span
-                                    class="absolute start-3 top-3 rounded-md bg-white/95 px-3 py-1.5 text-xs font-semibold text-forest-800">{{
-                                        article.category }}</span></button>
-                            <div class="p-5">
-                                <div class="flex items-center justify-between gap-3 text-xs text-gray-500"><strong
-                                        class="truncate font-semibold text-forest-700">{{ article.source
-                                        }}</strong><span class="shrink-0">{{ article.time }}</span></div><button
-                                    class="mt-3 line-clamp-2 text-start font-display text-lg font-bold leading-6 text-gray-900 hover:text-forest-700"
-                                    @click="selectedArticle = article">{{ article.title }}</button>
-                                <p class="mt-2 line-clamp-3 text-sm leading-6 text-gray-500">{{ article.summary }}</p>
-                                <div class="mt-4 flex items-center justify-between border-t border-gray-100 pt-3"><span
-                                        class="text-xs text-gray-500">{{ article.minutes }} phút đọc <i
-                                            class="mx-1 inline-block size-1 rounded-full bg-gray-300"></i>{{
-                                                article.author }}</span>
-                                    <div class="flex gap-2"><button
-                                            class="grid size-9 place-items-center rounded-lg border border-gray-200 text-sm text-forest-700 transition hover:bg-forest-50"
-                                            :aria-label="playingId === article.id ? 'Dừng đọc' : 'Nghe bài viết'"
-                                            @click="toggleSpeech(article)">{{ playingId === article.id ? 'Ⅱ' : '▶'
-                                            }}</button><button
-                                            :class="['grid size-9 place-items-center rounded-lg border text-lg transition', savedIds.includes(article.id) ? 'border-citrus-300 bg-citrus-50 text-forest-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50']"
-                                            :aria-label="savedIds.includes(article.id) ? 'Bỏ lưu bài viết' : 'Lưu bài viết'"
-                                            @click="toggleSaved(article)">♧</button></div>
-                                </div>
-                            </div>
-                        </article>
-                    </div>
-                    <div v-else
-                        class="grid min-h-64 place-content-center justify-items-center rounded-xl border border-dashed border-gray-300 bg-white text-center">
-                        <span class="text-3xl text-forest-400">⌕</span>
-                        <h3 class="mt-3 font-display text-lg font-bold text-gray-800">Không tìm thấy bài viết</h3>
-                        <p class="mt-1 text-sm text-gray-500">Hãy thử từ khóa hoặc chủ đề khác.</p><button
-                            class="mt-4 rounded-lg bg-forest-900 px-4 py-2.5 text-sm font-semibold text-white"
-                            @click="searchQuery = ''; activeCategory = 'Tất cả'; activeView = 'latest'">Xem tất cả
-                            tin</button>
-                    </div>
-                </section>
-                <footer
-                    class="mt-12 flex flex-wrap justify-between gap-3 border-t border-gray-200 py-5 text-xs text-gray-500">
-                    <span class="font-bold tracking-wider text-forest-800">READSNEWS · TIN TỨC THEO CÁCH CỦA
-                        BẠN</span><span>Đọc chậm lại, hiểu nhiều hơn.</span>
-                </footer>
-            </main>
+        <!-- Search Bar -->
+        <div class="relative hidden sm:block max-w-md flex-1">
+          <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3 text-slate-400">
+            <svg class="size-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.3-4.3" />
+            </svg>
+          </div>
+          <input v-model="searchQuery" type="search"
+            class="w-full rounded-full border border-slate-200 bg-slate-100/70 py-2 ps-10 pe-11 text-sm text-slate-900 placeholder:text-slate-400 transition-all focus:border-indigo-500 focus:bg-white focus:outline-hidden focus:ring-3 focus:ring-indigo-500/15"
+            placeholder="Tìm kiếm tin tức, chủ đề AI..." />
+          <kbd
+            class="pointer-events-none absolute inset-y-0 end-0 my-auto me-2.5 flex h-5.5 items-center rounded-md border border-slate-300 bg-white px-1.5 text-[10px] font-semibold text-slate-400 shadow-2xs">
+            ⌘K
+          </kbd>
         </div>
 
-        <Transition name="reader-modal">
-            <div v-if="selectedArticle"
-                class="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-gray-950/60 p-0 backdrop-blur-sm sm:p-5"
-                @click.self="selectedArticle = null">
-                <article
-                    class="relative max-h-screen w-full overflow-y-auto bg-white shadow-2xl sm:max-h-[92vh] sm:max-w-3xl sm:rounded-2xl"
-                    role="dialog" aria-modal="true" :aria-label="selectedArticle.title"><button
-                        class="absolute end-4 top-4 z-10 grid size-10 place-items-center rounded-full bg-gray-950/60 text-2xl text-white"
-                        aria-label="Đóng bài viết" @click="selectedArticle = null">×</button><img
-                        class="h-56 w-full object-cover sm:h-72" :src="selectedArticle.image"
-                        :alt="`Ảnh minh họa: ${selectedArticle.title}`" />
-                    <div class="px-5 py-7 sm:px-10 sm:py-9">
-                        <p class="text-sm font-bold text-forest-700">{{ selectedArticle.category }} <span
-                                class="px-2 text-gray-300">·</span>{{ selectedArticle.source }}</p>
-                        <h2 class="mt-3 font-display text-3xl font-bold leading-tight text-gray-900">{{
-                            selectedArticle.title }}</h2>
-                        <p class="mt-4 text-base leading-7 text-gray-600">{{ selectedArticle.summary }}</p>
-                        <p class="mt-4 border-y border-gray-100 py-3 text-sm text-gray-500">{{ selectedArticle.author }}
-                            · {{ selectedArticle.time }} · {{ selectedArticle.minutes }} phút đọc</p>
-                        <div class="article-body mt-5 whitespace-pre-line text-base leading-8 text-gray-700">{{
-                            selectedArticle.body }}</div><button
-                            class="mt-6 inline-flex h-11 items-center gap-2 rounded-lg bg-forest-900 px-4 text-sm font-semibold text-white hover:bg-forest-800"
-                            @click="toggleSpeech(selectedArticle)">{{ playingId === selectedArticle.id ? 'Ⅱ Dừng nghe' :
-                                '▶ Nghe bài viết' }}</button>
-                    </div>
-                </article>
+        <!-- User Actions / Status -->
+        <div class="flex items-center gap-2.5 sm:gap-3">
+          <template v-if="currentUser">
+            <div
+              class="hidden md:flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 border border-slate-200/80">
+              <span class="size-2 rounded-full bg-emerald-500"></span>
+              <span class="text-xs font-medium text-slate-600">
+                Chào, <strong class="text-slate-900 font-semibold">{{ readerName }}</strong>
+              </span>
+              <span v-if="currentUser.role === 'admin'"
+                class="rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700 uppercase">
+                Admin
+              </span>
             </div>
-        </Transition>
-        <Transition name="reader-toast">
-            <div v-if="notice"
-                class="fixed bottom-5 end-5 z-[60] rounded-lg border border-forest-200 bg-white px-4 py-3 text-sm font-medium text-forest-800 shadow-lg"
-                role="status">{{ notice }}</div>
-        </Transition>
-    </div>
+
+            <a v-if="currentUser.role === 'admin' || currentUser.role === 'editor'" href="/admin"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:border-slate-300 hover:bg-slate-50 transition-colors">
+              <svg class="size-3.5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2">
+                <rect width="7" height="9" x="3" y="3" rx="1" />
+                <rect width="7" height="5" x="14" y="3" rx="1" />
+                <rect width="7" height="9" x="14" y="12" rx="1" />
+                <rect width="7" height="5" x="3" y="16" rx="1" />
+              </svg>
+              Quản trị
+            </a>
+
+            <button @click="handleLogout"
+              class="rounded-lg p-2 text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+              title="Đăng xuất">
+              <svg class="size-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" x2="9" y1="12" y2="12" />
+              </svg>
+            </button>
+          </template>
+
+          <template v-else>
+            <a href="/signin"
+              class="rounded-lg px-3.5 py-2 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors">
+              Đăng nhập
+            </a>
+            <a href="/signup"
+              class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-xs sm:text-sm font-semibold text-white shadow-xs shadow-indigo-600/30 hover:bg-indigo-500 transition-all hover:shadow-md hover:shadow-indigo-600/20 active:scale-97">
+              Tạo tài khoản
+            </a>
+          </template>
+        </div>
+      </div>
+
+      <!-- Categories & Sub-nav Pills -->
+      <div class="border-t border-slate-100 bg-white">
+        <div
+          class="mx-auto flex max-w-7xl items-center justify-between gap-3 overflow-x-auto px-4 py-2 sm:px-6 lg:px-8 no-scrollbar">
+
+          <!-- Category Selector -->
+          <div class="flex items-center gap-1.5 shrink-0">
+            <button v-for="cat in categories" :key="cat" @click="setCategory(cat)" :class="[
+              'rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-200 shrink-0',
+              activeCategory === cat
+                ? 'bg-indigo-600 text-white shadow-xs shadow-indigo-600/25'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+            ]">
+              {{ cat }}
+            </button>
+          </div>
+
+          <!-- Feed Filter Modes -->
+          <div class="flex items-center gap-1.5 border-s border-slate-200 ps-3 shrink-0">
+            <button @click="activeView = 'latest'; activeCategory = 'Tất cả'" :class="[
+              'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors',
+              activeView === 'latest' ? 'bg-slate-100 font-semibold text-indigo-700' : 'text-slate-500 hover:text-slate-800'
+            ]">
+              <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              Mới nhất
+            </button>
+
+            <button @click="activeView = 'popular'; activeCategory = 'Tất cả'" :class="[
+              'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors',
+              activeView === 'popular' ? 'bg-slate-100 font-semibold text-indigo-700' : 'text-slate-500 hover:text-slate-800'
+            ]">
+              <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path
+                  d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 3z" />
+              </svg>
+              Nổi bật
+            </button>
+
+            <button @click="activeView = 'saved'; activeCategory = 'Tất cả'" :class="[
+              'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors',
+              activeView === 'saved' ? 'bg-slate-100 font-semibold text-indigo-700' : 'text-slate-500 hover:text-slate-800'
+            ]">
+              <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" />
+              </svg>
+              Đã lưu ({{ savedIds.length }})
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- 2. MAIN CONTAINER -->
+    <main class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+
+      <!-- HERO SECTION: FEATURED ARTICLE & AI AUDIO BRIEFING -->
+      <section class="mb-12 grid gap-6 lg:grid-cols-12 items-stretch">
+
+        <!-- FEATURED HERO CARD (8 Cols) -->
+        <article
+          class="lg:col-span-8 group relative overflow-hidden rounded-3xl bg-slate-900 shadow-xl shadow-slate-900/10 min-h-[460px] flex flex-col justify-end transition-all duration-300">
+          <!-- Background Cover Image with Gradient Scrim -->
+          <img :src="featuredArticle.image" :alt="featuredArticle.title"
+            class="absolute inset-0 size-full object-cover object-center opacity-85 transition-transform duration-700 ease-out group-hover:scale-105" />
+          <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/70 to-transparent"></div>
+
+          <!-- Top Tag -->
+          <div class="absolute top-6 start-6 z-10 flex items-center gap-2">
+            <span
+              class="inline-flex items-center gap-1.5 rounded-full bg-indigo-600/90 px-3 py-1 text-xs font-bold text-white shadow-sm backdrop-blur-md">
+              <span class="size-1.5 rounded-full bg-amber-300 animate-ping"></span>
+              TIN NỔI BẬT HÔM NAY
+            </span>
+            <span
+              class="inline-flex items-center gap-1 rounded-full bg-white/20 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-md border border-white/20">
+              <svg class="size-3 text-indigo-300" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+              </svg>
+              Giọng AI WaveNet
+            </span>
+          </div>
+
+          <!-- Bottom Content Info -->
+          <div class="relative z-10 p-6 sm:p-9 max-w-3xl">
+            <div class="flex items-center gap-3 text-xs font-medium text-slate-300 mb-3">
+              <span class="text-indigo-400 font-semibold">{{ featuredArticle.category }}</span>
+              <span>•</span>
+              <span>{{ featuredArticle.source }}</span>
+              <span>•</span>
+              <span>{{ featuredArticle.time }}</span>
+            </div>
+
+            <h1
+              class="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-white leading-snug drop-shadow-xs">
+              {{ featuredArticle.title }}
+            </h1>
+
+            <p class="mt-3 text-sm sm:text-base text-slate-300 line-clamp-2 leading-relaxed">
+              {{ featuredArticle.summary }}
+            </p>
+
+            <!-- Actions Bar -->
+            <div class="mt-6 flex flex-wrap items-center gap-3.5">
+              <!-- Play / Pause Speech Button -->
+              <button @click="toggleSpeech(featuredArticle)" :class="[
+                'inline-flex items-center gap-2.5 rounded-xl px-5 py-3 text-sm font-bold transition-all shadow-md active:scale-97 cursor-pointer',
+                playingId === featuredArticle.id && !isPaused
+                  ? 'bg-emerald-500 text-white shadow-emerald-500/30 ring-4 ring-emerald-500/20'
+                  : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30'
+              ]">
+                <!-- Play / Pause Icon -->
+                <svg v-if="playingId === featuredArticle.id && !isPaused" class="size-4.5" viewBox="0 0 24 24"
+                  fill="currentColor">
+                  <rect x="6" y="4" width="4" height="16" rx="1" />
+                  <rect x="14" y="4" width="4" height="16" rx="1" />
+                </svg>
+                <svg v-else class="size-4.5" viewBox="0 0 24 24" fill="currentColor">
+                  <polygon points="5 3 19 12 5 21 5 3" />
+                </svg>
+                <span>{{ playingId === featuredArticle.id && !isPaused ? 'Đang phát...' : 'Nghe bài viết' }}</span>
+                <span class="rounded bg-black/20 px-1.5 py-0.5 text-[11px] font-normal text-indigo-100">
+                  {{ featuredArticle.minutes }} phút
+                </span>
+              </button>
+
+              <!-- Read Article Detail -->
+              <button @click="selectedArticle = featuredArticle"
+                class="inline-flex items-center gap-2 rounded-xl bg-white/15 hover:bg-white/25 px-4 py-3 text-sm font-semibold text-white backdrop-blur-md border border-white/20 transition-colors cursor-pointer">
+                Đọc toàn bài
+                <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M5 12h14" />
+                  <path d="m12 5 7 7-7 7" />
+                </svg>
+              </button>
+
+              <!-- Bookmark Button -->
+              <button @click="toggleSaved(featuredArticle)" :class="[
+                'size-11 flex items-center justify-center rounded-xl border backdrop-blur-md transition-all cursor-pointer',
+                savedIds.includes(featuredArticle.id)
+                  ? 'bg-amber-400/90 border-amber-300 text-slate-950 shadow-md shadow-amber-400/20'
+                  : 'bg-white/10 hover:bg-white/20 border-white/20 text-white'
+              ]" :title="savedIds.includes(featuredArticle.id) ? 'Bỏ lưu' : 'Lưu bài'">
+                <svg class="size-5" viewBox="0 0 24 24"
+                  :fill="savedIds.includes(featuredArticle.id) ? 'currentColor' : 'none'" stroke="currentColor"
+                  stroke-width="2">
+                  <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </article>
+
+        <!-- AI AUDIO BRIEFING ASIDE (4 Cols) -->
+        <aside
+          class="lg:col-span-4 rounded-3xl border border-slate-200/90 bg-white p-6 shadow-sm flex flex-col justify-between">
+          <div>
+            <!-- Box Header -->
+            <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div class="flex items-center gap-2.5">
+                <div class="flex size-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+                  <svg class="size-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                    <line x1="12" x2="12" y1="19" y2="22" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 class="text-sm font-bold text-slate-900 uppercase tracking-wider">Trạm Tin AI Audio</h2>
+                  <p class="text-xs text-slate-500">Giọng đọc tổng hợp thông minh</p>
+                </div>
+              </div>
+
+              <!-- Animated Soundwave EQ -->
+              <div class="flex items-end gap-1 h-5" aria-hidden="true">
+                <span :class="['w-1 rounded-full bg-indigo-500', playingId ? 'h-5 animate-pulse' : 'h-2']"></span>
+                <span :class="['w-1 rounded-full bg-indigo-600', playingId ? 'h-3 animate-bounce' : 'h-3']"></span>
+                <span :class="['w-1 rounded-full bg-violet-600', playingId ? 'h-5 animate-pulse' : 'h-4']"></span>
+                <span :class="['w-1 rounded-full bg-indigo-500', playingId ? 'h-4 animate-bounce' : 'h-2']"></span>
+              </div>
+            </div>
+
+            <!-- Voice Control Speed -->
+            <div class="mt-4 rounded-xl bg-slate-50 p-3.5 border border-slate-100">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-semibold text-slate-600">Tốc độ phát âm:</span>
+                <span class="text-xs font-bold text-indigo-600">{{ speechRate }}x</span>
+              </div>
+              <div class="grid grid-cols-4 gap-1.5">
+                <button v-for="rate in [0.8, 1.0, 1.25, 1.5]" :key="rate" @click="changeSpeed(rate)" :class="[
+                  'rounded-lg py-1.5 text-xs font-bold transition-all',
+                  speechRate === rate
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-white text-slate-600 hover:bg-slate-200/70 border border-slate-200'
+                ]">
+                  {{ rate }}x
+                </button>
+              </div>
+            </div>
+
+            <!-- Quick Listen Playlist -->
+            <div class="mt-5">
+              <div class="flex items-center justify-between mb-2.5">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Danh sách phát nhanh</span>
+                <span class="text-xs font-semibold text-indigo-600">3 bài hot</span>
+              </div>
+
+              <div class="space-y-2">
+                <div v-for="item in articles.slice(1, 4)" :key="item.id" @click="toggleSpeech(item)" :class="[
+                  'group flex items-center gap-3 rounded-xl p-2.5 border transition-all cursor-pointer',
+                  playingId === item.id
+                    ? 'border-indigo-400 bg-indigo-50/60 shadow-xs'
+                    : 'border-slate-100 bg-white hover:border-slate-200 hover:bg-slate-50/80'
+                ]">
+                  <div :class="[
+                    'size-9 shrink-0 rounded-lg flex items-center justify-center transition-colors',
+                    playingId === item.id
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-slate-100 text-slate-600 group-hover:bg-indigo-100 group-hover:text-indigo-600'
+                  ]">
+                    <svg v-if="playingId === item.id && !isPaused" class="size-4" viewBox="0 0 24 24"
+                      fill="currentColor">
+                      <rect x="6" y="4" width="4" height="16" rx="1" />
+                      <rect x="14" y="4" width="4" height="16" rx="1" />
+                    </svg>
+                    <svg v-else class="size-4" viewBox="0 0 24 24" fill="currentColor">
+                      <polygon points="5 3 19 12 5 21 5 3" />
+                    </svg>
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <p
+                      class="text-xs font-semibold text-slate-900 truncate group-hover:text-indigo-600 transition-colors">
+                      {{ item.title }}
+                    </p>
+                    <p class="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1.5">
+                      <span>{{ item.category }}</span>
+                      <span>•</span>
+                      <span>{{ item.minutes }} phút</span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Helper Note -->
+          <div class="mt-6 pt-4 border-t border-slate-100 text-center">
+            <p class="text-xs text-slate-400">
+              Công nghệ chuyển văn bản thành giọng nói tiếng Việt
+            </p>
+          </div>
+        </aside>
+      </section>
+
+      <!-- 3. FEED SECTION: ARTICLE GRID -->
+      <section>
+        <!-- Section Header -->
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <div>
+            <h2 class="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+              <span>{{ feedTitle }}</span>
+              <span class="rounded-full bg-slate-200/70 px-2 py-0.5 text-xs font-bold text-slate-600">
+                {{ filteredArticles.length }}
+              </span>
+            </h2>
+            <p class="text-xs sm:text-sm text-slate-500 mt-1">
+              Tuyển tập những tin tức nổi bật được tối ưu cho cả đọc và nghe bằng AI
+            </p>
+          </div>
+        </div>
+
+        <!-- Articles Grid -->
+        <div v-if="filteredArticles.length" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <article v-for="item in filteredArticles" :key="item.id"
+            class="group flex flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xs transition-all duration-300 hover:-translate-y-1 hover:border-slate-300 hover:shadow-xl hover:shadow-slate-200/50">
+            <!-- Card Image Box -->
+            <div class="relative h-48 w-full overflow-hidden bg-slate-100">
+              <img :src="item.image" :alt="item.title"
+                class="size-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
+
+              <!-- Badges on Image -->
+              <span
+                class="absolute top-3 start-3 rounded-lg bg-white/95 px-2.5 py-1 text-xs font-bold text-indigo-700 shadow-sm backdrop-blur-xs">
+                {{ item.category }}
+              </span>
+
+              <!-- Quick Play Floating Button -->
+              <button @click="toggleSpeech(item)" :class="[
+                'absolute bottom-3 end-3 flex size-10 items-center justify-center rounded-full shadow-lg transition-transform active:scale-90 cursor-pointer',
+                playingId === item.id && !isPaused
+                  ? 'bg-emerald-500 text-white shadow-emerald-500/40'
+                  : 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-indigo-600/40'
+              ]" :title="playingId === item.id && !isPaused ? 'Tạm dừng' : 'Nghe bài này'">
+                <svg v-if="playingId === item.id && !isPaused" class="size-4" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="6" y="4" width="4" height="16" rx="1" />
+                  <rect x="14" y="4" width="4" height="16" rx="1" />
+                </svg>
+                <svg v-else class="size-4" viewBox="0 0 24 24" fill="currentColor">
+                  <polygon points="5 3 19 12 5 21 5 3" />
+                </svg>
+              </button>
+            </div>
+
+            <!-- Card Content Body -->
+            <div class="flex flex-1 flex-col justify-between p-5">
+              <div>
+                <div class="flex items-center justify-between text-xs font-medium text-slate-400 mb-2.5">
+                  <span class="text-indigo-600 font-semibold">{{ item.source }}</span>
+                  <span>{{ item.time }}</span>
+                </div>
+
+                <h3 @click="selectedArticle = item"
+                  class="text-base sm:text-lg font-bold text-slate-900 leading-snug line-clamp-2 hover:text-indigo-600 transition-colors cursor-pointer">
+                  {{ item.title }}
+                </h3>
+
+                <p class="mt-2 text-xs sm:text-sm text-slate-500 line-clamp-3 leading-relaxed">
+                  {{ item.summary }}
+                </p>
+              </div>
+
+              <!-- Card Footer -->
+              <div
+                class="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
+                <div class="flex items-center gap-1.5">
+                  <span class="font-medium text-slate-600">{{ item.author }}</span>
+                  <span>•</span>
+                  <span>{{ item.minutes }} phút đọc</span>
+                </div>
+
+                <div class="flex items-center gap-2">
+                  <button @click="toggleSaved(item)" :class="[
+                    'rounded-lg p-1.5 transition-colors cursor-pointer',
+                    savedIds.includes(item.id)
+                      ? 'text-amber-500 hover:text-amber-600 bg-amber-50'
+                      : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                  ]" :title="savedIds.includes(item.id) ? 'Bỏ lưu' : 'Lưu lại'">
+                    <svg class="size-4" viewBox="0 0 24 24" :fill="savedIds.includes(item.id) ? 'currentColor' : 'none'"
+                      stroke="currentColor" stroke-width="2">
+                      <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" />
+                    </svg>
+                  </button>
+
+                  <button @click="selectedArticle = item"
+                    class="rounded-lg p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer"
+                    title="Đọc toàn bài">
+                    <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M5 12h14" />
+                      <path d="m12 5 7 7-7 7" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <!-- Empty State -->
+        <div v-else class="rounded-3xl border border-dashed border-slate-300 bg-white p-12 text-center my-6">
+          <div class="mx-auto flex size-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 mb-4">
+            <svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.3-4.3" />
+            </svg>
+          </div>
+          <h3 class="text-base font-bold text-slate-900">Không tìm thấy bài viết phù hợp</h3>
+          <p class="mt-1 text-sm text-slate-500 max-w-sm mx-auto">
+            Thử tìm kiếm với từ khóa khác hoặc chuyển sang chuyên mục khác để tiếp tục đọc.
+          </p>
+          <button @click="searchQuery = ''; activeCategory = 'Tất cả'; activeView = 'latest'"
+            class="mt-5 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-indigo-500 transition-colors cursor-pointer">
+            Quay lại trang chủ
+          </button>
+        </div>
+      </section>
+
+      <!-- FOOTER -->
+      <footer
+        class="mt-20 border-t border-slate-200 pt-8 pb-16 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
+        <div class="flex items-center gap-2">
+          <span class="font-black text-slate-800">ReadsNews AI</span>
+          <span>— Nền tảng đọc tin tức thông minh bằng giọng nói</span>
+        </div>
+        <div>
+          <span>Thiết kế tối ưu cho trải nghiệm người dùng & đồ án công nghệ</span>
+        </div>
+      </footer>
+    </main>
+
+    <!-- 4. FLOATING DOCK AUDIO PLAYER (Hiển thị khi đang phát hoặc pause) -->
+    <Transition name="slide-up">
+      <div v-if="activePlayingArticle"
+        class="fixed bottom-4 inset-x-4 sm:inset-x-auto sm:end-8 sm:w-[480px] z-50 rounded-2xl border border-slate-200/90 bg-white/95 backdrop-blur-xl shadow-2xl p-4 transition-all">
+        <div class="flex items-center gap-3.5">
+          <!-- Thumbnail -->
+          <img :src="activePlayingArticle.image" :alt="activePlayingArticle.title"
+            class="size-13 rounded-xl object-cover shrink-0 shadow-xs border border-slate-200" />
+
+          <!-- Title & Meta -->
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-1.5 text-[10px] font-semibold text-indigo-600">
+              <span class="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span>ĐANG PHÁT AI VOICE</span>
+              <span class="text-slate-400">•</span>
+              <span class="text-slate-500">{{ speechRate }}x</span>
+            </div>
+            <h4 class="text-xs font-bold text-slate-900 truncate mt-0.5">
+              {{ activePlayingArticle.title }}
+            </h4>
+            <p class="text-[11px] text-slate-400 truncate">
+              {{ activePlayingArticle.author }} · {{ activePlayingArticle.source }}
+            </p>
+          </div>
+
+          <!-- Player Controls -->
+          <div class="flex items-center gap-1 shrink-0">
+            <!-- Play/Pause -->
+            <button @click="toggleSpeech(activePlayingArticle)"
+              class="flex size-10 items-center justify-center rounded-full bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30 transition-all active:scale-95 cursor-pointer">
+              <svg v-if="!isPaused" class="size-4.5" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="4" width="4" height="16" rx="1" />
+                <rect x="14" y="4" width="4" height="16" rx="1" />
+              </svg>
+              <svg v-else class="size-4.5" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="5 3 19 12 5 21 5 3" />
+              </svg>
+            </button>
+
+            <!-- Close Player -->
+            <button @click="stopSpeech"
+              class="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
+              title="Đóng trình phát">
+              <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Mini Progress Bar -->
+        <div class="mt-3">
+          <div class="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+            <div class="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 transition-all duration-300 rounded-full"
+              :style="{ width: `${playbackProgress}%` }"></div>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- 5. ARTICLE DETAIL MODAL (MODAL ĐỌC BÀI KÈM TÓM TẮT AI) -->
+    <Transition name="fade">
+      <div v-if="selectedArticle"
+        class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/70 p-4 sm:p-6 backdrop-blur-sm"
+        @click.self="selectedArticle = null">
+        <div
+          class="relative max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-white shadow-2xl transition-all">
+
+          <!-- Close Button -->
+          <button @click="selectedArticle = null"
+            class="absolute top-4 end-4 z-20 flex size-9 items-center justify-center rounded-full bg-slate-900/60 hover:bg-slate-900 text-white backdrop-blur-md transition-colors cursor-pointer">
+            <svg class="size-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+
+          <!-- Modal Cover Image -->
+          <div class="relative h-64 sm:h-80 w-full overflow-hidden bg-slate-900">
+            <img :src="selectedArticle.image" :alt="selectedArticle.title"
+              class="size-full object-cover object-center" />
+            <div class="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent"></div>
+
+            <div class="absolute bottom-4 start-6 text-white text-xs font-semibold flex items-center gap-2">
+              <span class="rounded-md bg-indigo-600 px-2.5 py-1">{{ selectedArticle.category }}</span>
+              <span>{{ selectedArticle.source }}</span>
+            </div>
+          </div>
+
+          <!-- Article Content Body -->
+          <div class="p-6 sm:p-10">
+            <div class="flex items-center gap-2 text-xs text-slate-400 mb-3">
+              <span>Tác giả: <strong class="text-slate-700">{{ selectedArticle.author }}</strong></span>
+              <span>•</span>
+              <span>{{ selectedArticle.time }}</span>
+              <span>•</span>
+              <span>{{ selectedArticle.minutes }} phút đọc</span>
+            </div>
+
+            <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900 leading-tight">
+              {{ selectedArticle.title }}
+            </h2>
+
+            <!-- AI Summary Box Spotlight -->
+            <div
+              class="mt-6 rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50/80 via-white to-violet-50/60 p-5 shadow-xs">
+              <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2 text-indigo-700">
+                  <!-- Sparkles AI Icon -->
+                  <svg class="size-5" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2l2.4 7.2L21.6 12l-7.2 2.4L12 21.6l-2.4-7.2L2.4 12l7.2-2.4L12 2z" />
+                  </svg>
+                  <span class="text-xs font-extrabold uppercase tracking-wider">Tóm tắt thông minh bởi AI</span>
+                </div>
+                <span class="text-[11px] font-semibold text-slate-400">Thời gian đọc ~30s</span>
+              </div>
+              <p class="whitespace-pre-line text-sm text-slate-700 leading-relaxed font-medium">
+                {{ selectedArticle.aiSummary }}
+              </p>
+            </div>
+
+            <!-- Listen Bar in Modal -->
+            <div
+              class="mt-6 flex flex-wrap items-center justify-between gap-3 p-4 rounded-xl bg-slate-50 border border-slate-100">
+              <div class="flex items-center gap-3">
+                <button @click="toggleSpeech(selectedArticle)"
+                  class="flex size-11 items-center justify-center rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/25 transition-transform active:scale-95 cursor-pointer">
+                  <svg v-if="playingId === selectedArticle.id && !isPaused" class="size-5" viewBox="0 0 24 24"
+                    fill="currentColor">
+                    <rect x="6" y="4" width="4" height="16" rx="1" />
+                    <rect x="14" y="4" width="4" height="16" rx="1" />
+                  </svg>
+                  <svg v-else class="size-5" viewBox="0 0 24 24" fill="currentColor">
+                    <polygon points="5 3 19 12 5 21 5 3" />
+                  </svg>
+                </button>
+                <div>
+                  <p class="text-xs font-bold text-slate-900">
+                    {{ playingId === selectedArticle.id && !isPaused ? 'Đang đọc thành tiếng...' : 'Nghe toàn bộ bài viết'
+                    }}
+                  </p>
+                  <p class="text-[11px] text-slate-500">{{ selectedArticle.voice }}</p>
+                </div>
+              </div>
+
+              <button @click="toggleSaved(selectedArticle)" :class="[
+                'inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold border transition-colors cursor-pointer',
+                savedIds.includes(selectedArticle.id)
+                  ? 'border-amber-300 bg-amber-50 text-amber-700'
+                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
+              ]">
+                <svg class="size-4" viewBox="0 0 24 24"
+                  :fill="savedIds.includes(selectedArticle.id) ? 'currentColor' : 'none'" stroke="currentColor"
+                  stroke-width="2">
+                  <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" />
+                </svg>
+                <span>{{ savedIds.includes(selectedArticle.id) ? 'Đã lưu' : 'Lưu bài' }}</span>
+              </button>
+            </div>
+
+            <!-- Full Article Body -->
+            <div class="mt-8 text-slate-700 leading-relaxed text-base sm:text-lg whitespace-pre-line space-y-4">
+              {{ selectedArticle.body }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- 6. LOGOUT CONFIRM MODAL -->
+    <Transition name="fade">
+      <div v-if="showLogoutModal"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm"
+        @click.self="showLogoutModal = false">
+        <div class="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl border border-slate-100 text-center">
+          <div
+            class="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-rose-50 text-rose-500 ring-8 ring-rose-50/50">
+            <svg class="size-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+          </div>
+          <h3 class="font-display text-lg font-extrabold text-slate-900">Đăng xuất tài khoản?</h3>
+          <p class="mt-1.5 text-xs leading-relaxed text-slate-500">
+            Bạn có chắc muốn đăng xuất khỏi ReadsNews không?<br />
+            Các bài viết đã lưu vẫn được giữ nguyên trên thiết bị này.
+          </p>
+          <div class="mt-5 flex items-center justify-center gap-3">
+            <button @click="showLogoutModal = false"
+              class="h-10 rounded-xl border border-slate-200 bg-white px-5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition">
+              Ở lại
+            </button>
+            <button @click="confirmLogout"
+              class="h-10 rounded-xl bg-rose-600 px-5 text-xs font-bold text-white shadow-md shadow-rose-600/25 hover:bg-rose-700 transition">
+              Đăng xuất
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- 7. TOAST NOTIFICATION -->
+    <Transition name="fade">
+      <div v-if="notice"
+        class="fixed bottom-6 start-6 z-50 flex items-center gap-2.5 rounded-xl border border-indigo-200 bg-white px-4 py-3 text-xs sm:text-sm font-semibold text-slate-800 shadow-xl">
+        <span class="size-2 rounded-full bg-indigo-500 animate-ping"></span>
+        <span>{{ notice }}</span>
+      </div>
+    </Transition>
+  </div>
 </template>
+
+<style scoped>
+/* Smooth scroll and transitions */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Modal Transition */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.25s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* Floating Dock Slide Up */
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.slide-up-enter-from,
+.slide-up-leave-to {
+  opacity: 0;
+  transform: translateY(20px);
+}
+</style>
