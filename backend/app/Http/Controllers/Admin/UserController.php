@@ -48,7 +48,8 @@ class UserController extends Controller
             $query->where('is_active', $isActive);
         }
 
-        $users = $query->orderBy('id', 'desc')->get();
+        $perPage = min((int) $request->input('per_page', 10), 100);
+        $paginated = $query->orderBy('id', 'desc')->paginate($perPage);
 
         // Thống kê nhanh toàn bộ hệ thống
         $totalUsers = User::count();
@@ -57,10 +58,13 @@ class UserController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $users,
+            'data' => $paginated->items(),
             'meta' => [
-                'total' => $totalUsers,
-                'active_count' => $activeCount,
+                'total'        => $paginated->total(),
+                'per_page'     => $paginated->perPage(),
+                'current_page' => $paginated->currentPage(),
+                'last_page'    => $paginated->lastPage(),
+                'active_count'   => $activeCount,
                 'inactive_count' => $inactiveCount,
             ],
         ], 200);
