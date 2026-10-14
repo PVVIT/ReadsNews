@@ -3,7 +3,7 @@ import apiClient from './axios'
 export const authService = {
   /**
    * Đăng ký tài khoản mới
-   * @param {Object} data { name, email, password, password_confirmation, role }
+   * @param {Object} data
    */
   async register(data) {
     const response = await apiClient.post('/auth/register', data)

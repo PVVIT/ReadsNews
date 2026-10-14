@@ -7,18 +7,33 @@
 @theme {
     --font-sans: 'DM Sans', sans-serif;
     --font-display: 'Manrope', sans-serif;
-    --color-brand-25: #f2f7ff;
-    --color-brand-50: #ecf3ff;
-    --color-brand-100: #dde9ff;
-    --color-brand-200: #c2d6ff;
-    --color-brand-300: #9cb9ff;
-    --color-brand-400: #7592ff;
-    --color-brand-500: #465fff;
-    --color-brand-600: #3641f5;
-    --color-brand-700: #2a31d8;
-    --color-brand-800: #252dae;
-    --color-brand-900: #262e89;
-    --color-brand-950: #161950;
+    /* ReadVn Brand Color: Ocean Blue & Technology Wave */
+    --color-brand-25: #f0f9ff;
+    --color-brand-50: #e0f2fe;
+    --color-brand-100: #bae6fd;
+    --color-brand-200: #7dd3fc;
+    --color-brand-300: #38bdf8;
+    --color-brand-400: #0ea5e9;
+    --color-brand-500: #0284c7;
+    --color-brand-600: #0369a1;
+    --color-brand-700: #075985;
+    --color-brand-800: #0c4a6e;
+    --color-brand-900: #082f49;
+    --color-brand-950: #041b2c;
+
+    /* ReadVn Accent: Vibrant Orange & Voice Wave */
+    --color-accent-50: #fff7ed;
+    --color-accent-100: #ffedd5;
+    --color-accent-200: #fed7aa;
+    --color-accent-300: #fdba74;
+    --color-accent-400: #fb923c;
+    --color-accent-500: #f97316;
+    --color-accent-600: #ea580c;
+    --color-accent-700: #c2410c;
+    --color-accent-800: #9a3412;
+    --color-accent-900: #7c2d12;
+    --color-accent-950: #431407;
+
     --color-error-500: #f04438;
     --text-title-sm: 30px;
     --text-title-sm--line-height: 38px;

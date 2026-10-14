@@ -293,32 +293,13 @@ onBeforeUnmount(() => {
       class="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200/80 transition-all duration-200 shadow-xs">
       <div class="mx-auto flex h-18 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
 
-        <!-- Logo -->
-        <a href="/" class="group flex shrink-0 items-center gap-2.5">
-          <div
-            class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/20 group-hover:scale-105 transition-transform duration-200">
-            <!-- Soundwave AI Icon -->
-            <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-              stroke-linecap="round" stroke-linejoin="round">
-              <path d="M2 10v4" />
-              <path d="M6 7v10" />
-              <path d="M10 4v16" />
-              <path d="M14 7v10" />
-              <path d="M18 10v4" />
-              <path d="M22 12v0" />
-            </svg>
-          </div>
-          <div class="flex flex-col">
-            <span
-              class="text-lg font-black tracking-tight text-slate-900 group-hover:text-indigo-600 transition-colors">
-              Reads<span class="text-indigo-600">News</span>
-            </span>
-            <span
-              class="text-[10px] font-semibold tracking-wider text-indigo-500 uppercase -mt-1 flex items-center gap-1">
-              <span class="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              AI Audio Reader
-            </span>
-          </div>
+        <!-- Logo Thương Hiệu ReadVn -->
+        <a href="/" class="group flex shrink-0 items-center gap-3">
+          <img
+            src="/logo/Khuon-Ngang-removebg.png"
+            alt="ReadVn - Báo Đọc Tin Nhanh"
+            class="h-10 sm:h-11.5 w-auto object-contain transition-transform duration-200 group-hover:scale-102"
+          />
         </a>
 
         <!-- Search Bar -->
@@ -771,13 +752,19 @@ onBeforeUnmount(() => {
 
       <!-- FOOTER -->
       <footer
-        class="mt-20 border-t border-slate-200 pt-8 pb-16 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400">
-        <div class="flex items-center gap-2">
-          <span class="font-black text-slate-800">ReadsNews AI</span>
-          <span>— Nền tảng đọc tin tức thông minh bằng giọng nói</span>
+        class="mt-20 border-t border-slate-200 pt-8 pb-16 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+        <div class="flex items-center gap-3">
+          <img src="/logo/Khuon-Tron-removebg.png" alt="ReadVn" class="size-8.5 object-contain" />
+          <div>
+            <div class="flex items-center gap-1.5 font-display text-xs sm:text-sm font-extrabold text-slate-900">
+              <span>Read<span class="text-orange-500">Vn</span></span>
+              <span class="rounded bg-sky-50 px-1.5 py-0.2 text-[9px] font-bold text-sky-600 ring-1 ring-sky-200">Báo Đọc – Tin Nhanh</span>
+            </div>
+            <p class="text-[11px] text-slate-400">Nền tảng đọc báo thông minh kết hợp giọng nói AI</p>
+          </div>
         </div>
         <div>
-          <span>Thiết kế tối ưu cho trải nghiệm người dùng & đồ án công nghệ</span>
+          <span class="text-slate-400">Thiết kế tối ưu cho trải nghiệm người dùng & đồ án công nghệ</span>
         </div>
       </footer>
     </main>

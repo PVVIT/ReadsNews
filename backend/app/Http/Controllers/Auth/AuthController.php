@@ -115,10 +115,6 @@ class AuthController extends Controller
         ], 200);
     }
 
-    /**
-     * Gửi email liên kết khôi phục mật khẩu.
-     * POST /api/auth/forgot-password
-     */
     public function forgotPassword(Request $request): JsonResponse
     {
         $request->validate([
@@ -134,7 +130,6 @@ class AuthController extends Controller
         // Tạo token bằng Password broker (tự động lưu vào password_reset_tokens)
         $token = Password::broker()->createToken($user);
 
-        // Tạo URL đặt lại mật khẩu trỏ về frontend
         $frontendUrl = rtrim(env('FRONTEND_URL', 'http://localhost:5173'), '/');
         $resetUrl = "{$frontendUrl}/reset-password?token={$token}&email=" . urlencode($user->email);
 
@@ -153,10 +148,6 @@ class AuthController extends Controller
         ], 200);
     }
 
-    /**
-     * Đặt lại mật khẩu mới bằng token.
-     * POST /api/auth/reset-password
-     */
     public function resetPassword(Request $request): JsonResponse
     {
         $request->validate([
@@ -181,7 +172,6 @@ class AuthController extends Controller
                 ])->setRememberToken(Str::random(60));
                 $user->save();
 
-                // Hủy tất cả access tokens cũ để bảo mật
                 $user->tokens()->delete();
             }
         );
@@ -199,10 +189,6 @@ class AuthController extends Controller
         ], 400);
     }
 
-    /**
-     * Lấy thông tin tài khoản đang đăng nhập.
-     * GET /api/auth/me
-     */
     public function me(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -220,10 +206,6 @@ class AuthController extends Controller
         ], 200);
     }
 
-    /**
-     * Đăng xuất (xóa token hiện tại).
-     * POST /api/auth/logout
-     */
     public function logout(Request $request): JsonResponse
     {
         $user = $request->user();

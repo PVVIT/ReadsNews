@@ -25,7 +25,6 @@ onBeforeUnmount(() => {
   window.removeEventListener('popstate', updatePath)
 })
 
-// ─── Route Guard Phân Quyền ──────────────────────────────────────────────────
 /**
  * Chỉ admin và editor mới được truy cập /admin.
  * Nếu không có quyền → redirect về trang chủ và set cờ unauthorizedAccess.

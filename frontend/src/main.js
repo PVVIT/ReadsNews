@@ -4,6 +4,8 @@ import './assets/admin.css'
 import { vRole } from './utils/auth'
 import Vue3Toastify, { toast } from 'vue3-toastify'
 import 'vue3-toastify/dist/index.css'
+import { QuillEditor } from '@vueup/vue-quill'
+import '@vueup/vue-quill/dist/vue-quill.snow.css'
 
 const app = createApp(App)
 
@@ -38,5 +40,6 @@ app.use(Vue3Toastify, {
 app.directive('role', vRole)
 app.component('RouterLink', RouterLinkCompat)
 app.component('router-link', RouterLinkCompat)
+app.component('QuillEditor', QuillEditor)
 
 app.mount('#app')

@@ -133,19 +133,16 @@
         </div>
 
         <!-- Cột Phải Minh Họa -->
-        <div class="lg:w-1/2 w-full h-full bg-brand-950 dark:bg-white/5 lg:grid items-center hidden relative">
+        <div class="lg:w-1/2 w-full h-full bg-slate-900 dark:bg-white/5 lg:grid items-center hidden relative">
           <div class="items-center justify-center flex z-1">
             <common-grid-shape />
             <div class="flex flex-col items-center max-w-sm text-center px-6">
               <router-link to="/" class="block mb-5">
-                <div class="flex items-center gap-3">
-                  <div class="flex size-12 items-center justify-center rounded-2xl bg-brand-500 text-white font-extrabold shadow-lg shadow-brand-500/30">
-                    RN
-                  </div>
-                  <span class="font-display text-2xl font-black text-white tracking-tight">ReadsNews AI</span>
+                <div class="rounded-2xl bg-white p-3 shadow-xl shadow-sky-500/20 inline-block hover:scale-105 transition">
+                  <img src="/logo/Khuon-Ngang-removebg.png" alt="ReadVn" class="h-11 w-auto object-contain" />
                 </div>
               </router-link>
-              <h2 class="text-lg font-bold text-white mb-2">Trải nghiệm đọc báo kiểu mới</h2>
+              <h2 class="text-lg font-bold text-white mb-2">Báo Đọc – Tin Nhanh cùng AI Audio</h2>
               <p class="text-xs text-gray-400 leading-relaxed">
                 Tạo tài khoản miễn phí để nghe báo mọi lúc mọi nơi, tóm tắt nhanh nội dung bằng trí tuệ nhân tạo và lưu trữ bài viết yêu thích.
               </p>

@@ -1,6 +1,7 @@
 <script setup>
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { auth } from '@/utils/auth'
+import { userService } from '@/services/userService'
 
 const sections = [
     { id: 'overview', label: 'Tổng quan' },
@@ -23,7 +24,7 @@ let flashTimer
 
 // Lấy thông tin tài khoản hiện tại từ auth utils hoặc fallback mặc định
 const currentUser = computed(() => {
-    return auth.getUser() || { name: 'Admin ReadsNews', email: 'admin@readsnews.vn', role: 'admin' }
+    return auth.getUser() || { id: null, name: 'Admin ReadsNews', email: 'admin@readsnews.vn', role: 'admin' }
 })
 
 const categories = ref([
@@ -40,14 +41,17 @@ const sources = [
     { id: 3, name: 'Thanh Niên' },
 ]
 
-const users = ref([
-    { id: 1, name: 'Nguyễn Minh Anh', email: 'minhanh@gmail.com', role: 'admin', is_active: true, created_at: '2026-10-02T09:12:00' },
-    { id: 2, name: 'Trần Quốc Bảo', email: 'bao.tran@gmail.com', role: 'editor', is_active: true, created_at: '2026-09-29T14:25:00' },
-    { id: 3, name: 'Lê Thu Hà', email: 'thuha.le@gmail.com', role: 'user', is_active: true, created_at: '2026-09-27T10:48:00' },
-    { id: 4, name: 'Phạm Hoàng Long', email: 'long.pham@gmail.com', role: 'user', is_active: false, created_at: '2026-09-23T16:05:00' },
-    { id: 5, name: 'Đỗ Hải Yến', email: 'yen.do@gmail.com', role: 'editor', is_active: true, created_at: '2026-09-20T08:40:00' },
-    { id: 6, name: 'Vũ Đức Thành', email: 'thanh.vu@gmail.com', role: 'user', is_active: true, created_at: '2026-09-18T11:30:00' },
-])
+// Quản lý người dùng thực tế từ Database
+const users = ref([])
+const isUsersLoading = ref(false)
+const userModal = ref(false)
+const userForm = ref({
+    name: '',
+    email: '',
+    password: '',
+    role: 'user',
+    is_active: true,
+})
 
 const articles = ref([
     {
@@ -352,17 +356,98 @@ function askDelete(type, record) {
     deleteTarget.value = { type, record }
 }
 
-function confirmDelete() {
+async function confirmDelete() {
     const { type, record } = deleteTarget.value
     if (type === 'article') {
         articles.value = articles.value.filter((article) => article.id !== record.id)
-    } else {
+        notify('Đã xóa bài báo thành công.')
+    } else if (type === 'category') {
         categories.value = categories.value.filter((category) => category.id !== record.id)
         categories.value = categories.value.map((category) => category.parent_id === record.id ? { ...category, parent_id: null } : category)
         articles.value = articles.value.map((article) => article.category_id === record.id ? { ...article, category_id: null } : article)
+        notify('Đã xóa danh mục thành công.')
+    } else if (type === 'user') {
+        try {
+            await userService.deleteUser(record.id)
+            users.value = users.value.filter((u) => u.id !== record.id)
+            notify(`Đã xóa tài khoản ${record.name} thành công.`)
+        } catch (err) {
+            console.error('Lỗi khi xóa người dùng:', err)
+        }
     }
     deleteTarget.value = null
-    notify(type === 'article' ? 'Đã xóa bài báo thành công.' : 'Đã xóa danh mục thành công.')
+}
+
+// ─── API Người Dùng (Users) ──────────────────────────────────────────────────
+async function fetchUsers() {
+    isUsersLoading.value = true
+    try {
+        const res = await userService.getUsers()
+        if (res?.success) {
+            users.value = res.data || []
+        }
+    } catch (err) {
+        console.error('Lỗi khi tải danh sách người dùng:', err)
+    } finally {
+        isUsersLoading.value = false
+    }
+}
+
+async function handleToggleUserStatus(user) {
+    if (user.id === currentUser.value?.id) {
+        notify('Bạn không thể tự khóa tài khoản của chính mình!')
+        return
+    }
+    try {
+        const res = await userService.toggleStatus(user.id)
+        if (res?.success) {
+            user.is_active = res.data.is_active
+            notify(res.message || 'Cập nhật trạng thái thành công!')
+        }
+    } catch (err) {
+        console.error('Lỗi khi đổi trạng thái người dùng:', err)
+    }
+}
+
+async function handleRoleChange(user, newRole) {
+    if (user.id === currentUser.value?.id) {
+        notify('Bạn không thể tự thay đổi vai trò của chính mình!')
+        return
+    }
+    try {
+        const res = await userService.updateRole(user.id, newRole)
+        if (res?.success) {
+            user.role = res.data.role
+            notify(res.message || 'Cập nhật vai trò thành công!')
+        }
+    } catch (err) {
+        console.error('Lỗi khi đổi vai trò người dùng:', err)
+    }
+}
+
+function openUserModal() {
+    userForm.value = {
+        name: '',
+        email: '',
+        password: '',
+        role: 'user',
+        is_active: true,
+    }
+    userModal.value = true
+}
+
+async function saveUser() {
+    try {
+        const res = await userService.createUser(userForm.value)
+        if (res?.success) {
+            userModal.value = false
+            userForm.value = { name: '', email: '', password: '', role: 'user', is_active: true }
+            notify('Đã thêm người dùng mới thành công!')
+            await fetchUsers()
+        }
+    } catch (err) {
+        console.error('Lỗi khi tạo người dùng:', err)
+    }
 }
 
 function handleLogout() {
@@ -379,27 +464,27 @@ function roleBadgeClasses(role) {
     return 'bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-200/60'
 }
 
+onMounted(() => {
+    fetchUsers()
+})
+
 onBeforeUnmount(() => window.clearTimeout(flashTimer))
 </script>
 
 <template>
-    <div class="min-h-screen bg-slate-50/70 font-sans text-slate-800 antialiased selection:bg-indigo-500 selection:text-white">
+    <div class="min-h-screen bg-slate-50/70 font-sans text-slate-800 antialiased selection:bg-sky-500 selection:text-white">
         <!-- Sidebar Cố Định (Desktop) -->
         <aside class="fixed inset-y-0 start-0 z-30 hidden w-64 flex-col border-r border-slate-800/80 bg-slate-900 text-slate-300 lg:flex shadow-2xl">
             <!-- Brand Logo Header -->
-            <div class="flex h-18 items-center justify-between border-b border-slate-800/80 px-6">
+            <div class="flex h-18 items-center justify-between border-b border-slate-800/80 px-5">
                 <a href="#overview" @click.prevent="setSection('overview')" class="group flex items-center gap-3">
-                    <div class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-violet-500 shadow-md shadow-indigo-500/25 transition group-hover:scale-105">
-                        <svg class="size-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                        </svg>
-                    </div>
+                    <img src="/logo/Khuon-Tron-removebg.png" alt="ReadVn" class="size-10 rounded-xl bg-white p-1 shadow-md shadow-sky-500/20 transition group-hover:scale-105 shrink-0 object-contain" />
                     <div>
                         <div class="flex items-center gap-1.5 font-display text-base font-extrabold tracking-tight text-white">
-                            <span>ReadsNews</span>
-                            <span class="rounded bg-indigo-500/20 px-1.5 py-0.5 text-[9px] font-bold text-indigo-300 ring-1 ring-indigo-500/30">AI CMS</span>
+                            <span>Read<span class="text-orange-500">Vn</span></span>
+                            <span class="rounded bg-sky-500/20 px-1.5 py-0.5 text-[9px] font-bold text-sky-300 ring-1 ring-sky-500/30">AI CMS</span>
                         </div>
-                        <p class="text-[11px] text-slate-400">Quản trị tin tức & audio</p>
+                        <p class="text-[11px] text-slate-400">Báo Đọc – Tin Nhanh</p>
                     </div>
                 </a>
             </div>
@@ -413,7 +498,7 @@ onBeforeUnmount(() => window.clearTimeout(flashTimer))
                             :class="[
                                 'group flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-start text-xs font-semibold transition-all duration-150',
                                 activeSection === section.id
-                                    ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-md shadow-indigo-600/25 ring-1 ring-white/10'
+                                    ? 'bg-gradient-to-r from-sky-600 to-blue-700 text-white shadow-md shadow-sky-600/25 ring-1 ring-white/10'
                                     : 'text-slate-400 hover:bg-slate-800/80 hover:text-white'
                             ]"
                             @click="setSection(section.id)">
@@ -598,13 +683,13 @@ onBeforeUnmount(() => window.clearTimeout(flashTimer))
                 <div class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <div class="flex items-center gap-2 text-xs font-medium text-slate-400">
-                            <svg class="size-3.5 text-indigo-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <svg class="size-3.5 text-sky-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
                                 <line x1="16" y1="2" x2="16" y2="6" />
                                 <line x1="8" y1="2" x2="8" y2="6" />
                                 <line x1="3" y1="10" x2="21" y2="10" />
                             </svg>
-                            <span>Tháng 10, 2026 · Hệ thống ReadsNews AI</span>
+                            <span>Tháng 10, 2026 · Hệ thống ReadVn AI</span>
                         </div>
                         <h2 class="mt-1 font-display text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
                             {{ activeSection === 'overview' ? `Xin chào, ${currentUser.name}` : pageTitle }}
@@ -615,7 +700,7 @@ onBeforeUnmount(() => window.clearTimeout(flashTimer))
                     <div class="flex items-center gap-3">
                         <button v-if="activeSection === 'articles'"
                             @click="openArticleForm()"
-                            class="inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 px-4 text-xs font-bold text-white shadow-md shadow-indigo-600/25 transition hover:brightness-110 active:scale-98">
+                            class="inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-sky-600 to-blue-700 px-4 text-xs font-bold text-white shadow-md shadow-sky-600/25 transition hover:brightness-110 active:scale-98">
                             <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M12 5v14M5 12h14" />
                             </svg>
@@ -624,11 +709,23 @@ onBeforeUnmount(() => window.clearTimeout(flashTimer))
 
                         <button v-if="activeSection === 'categories'"
                             @click="openCategoryForm()"
-                            class="inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 px-4 text-xs font-bold text-white shadow-md shadow-indigo-600/25 transition hover:brightness-110 active:scale-98">
+                            class="inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-sky-600 to-blue-700 px-4 text-xs font-bold text-white shadow-md shadow-sky-600/25 transition hover:brightness-110 active:scale-98">
                             <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M12 5v14M5 12h14" />
                             </svg>
                             <span>Thêm danh mục mới</span>
+                        </button>
+
+                        <button v-if="activeSection === 'users'"
+                            @click="openUserModal()"
+                            class="inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-600 px-4 text-xs font-bold text-white shadow-md shadow-orange-500/25 transition hover:brightness-110 active:scale-98">
+                            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                                <circle cx="9" cy="7" r="4" />
+                                <line x1="19" y1="8" x2="19" y2="14" />
+                                <line x1="22" y1="11" x2="16" y2="11" />
+                            </svg>
+                            <span>Thêm tài khoản mới</span>
                         </button>
                     </div>
                 </div>
@@ -1138,8 +1235,24 @@ onBeforeUnmount(() => window.clearTimeout(flashTimer))
                                 <p class="text-xs text-slate-400">{{ users.length }} tài khoản trong hệ thống · {{ activeUserCount }} đang hoạt động</p>
                             </div>
 
-                            <div class="flex items-center gap-2.5">
-                                <div class="relative w-56">
+                            <div class="flex flex-wrap items-center gap-2.5">
+                                <!-- Nút Làm mới danh sách -->
+                                <button
+                                    @click="fetchUsers"
+                                    :disabled="isUsersLoading"
+                                    title="Tải lại danh sách người dùng từ máy chủ"
+                                    class="inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50">
+                                    <svg class="size-3.5" :class="{ 'animate-spin text-indigo-600': isUsersLoading }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                                        <path d="M3 3v5h5" />
+                                        <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+                                        <path d="M16 21h5v-5" />
+                                    </svg>
+                                    <span class="hidden sm:inline">Làm mới</span>
+                                </button>
+
+                                <!-- Ô tìm kiếm -->
+                                <div class="relative w-52 sm:w-56">
                                     <span class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3 text-slate-400">
                                         <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
                                     </span>
@@ -1149,6 +1262,7 @@ onBeforeUnmount(() => window.clearTimeout(flashTimer))
                                         placeholder="Tìm tên, email..." />
                                 </div>
 
+                                <!-- Lọc theo vai trò -->
                                 <select v-model="selectedRole"
                                     class="h-9 rounded-xl border border-slate-200 bg-slate-50/60 px-3 text-xs font-medium text-slate-700 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100">
                                     <option value="all">Tất cả vai trò</option>
@@ -1159,7 +1273,19 @@ onBeforeUnmount(() => window.clearTimeout(flashTimer))
                             </div>
                         </div>
 
-                        <div class="overflow-x-auto">
+                        <!-- Trạng thái loading -->
+                        <div v-if="isUsersLoading && !users.length" class="p-12 text-center text-slate-400">
+                            <div class="inline-flex items-center gap-2 text-xs font-semibold text-indigo-600">
+                                <svg class="size-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                    <circle cx="12" cy="12" r="10" stroke-opacity="0.25" />
+                                    <path d="M12 2a10 10 0 0 1 10 10" />
+                                </svg>
+                                <span>Đang tải danh sách người dùng từ hệ thống...</span>
+                            </div>
+                        </div>
+
+                        <!-- Bảng dữ liệu người dùng -->
+                        <div v-else class="overflow-x-auto">
                             <table class="w-full text-start text-xs">
                                 <thead>
                                     <tr class="border-b border-slate-100 bg-slate-50/70 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
@@ -1167,6 +1293,7 @@ onBeforeUnmount(() => window.clearTimeout(flashTimer))
                                         <th class="px-4 py-3.5 text-start">Vai trò</th>
                                         <th class="px-4 py-3.5 text-start">Trạng thái</th>
                                         <th class="px-4 py-3.5 text-start">Ngày tham gia</th>
+                                        <th class="px-4 py-3.5 text-center">Thao tác</th>
                                         <th class="px-6 py-3.5 text-end">Mã định danh</th>
                                     </tr>
                                 </thead>
@@ -1178,20 +1305,38 @@ onBeforeUnmount(() => window.clearTimeout(flashTimer))
                                                     {{ user.name.split(' ').map((p) => p[0]).slice(-2).join('') }}
                                                 </div>
                                                 <div>
-                                                    <p class="font-bold text-slate-900">{{ user.name }}</p>
+                                                    <div class="flex items-center gap-1.5">
+                                                        <p class="font-bold text-slate-900">{{ user.name }}</p>
+                                                        <span v-if="user.id === currentUser?.id" class="rounded bg-indigo-50 px-1.5 py-0.2 text-[9px] font-bold text-indigo-600 ring-1 ring-indigo-200/50">
+                                                            Bạn
+                                                        </span>
+                                                    </div>
                                                     <p class="text-[11px] text-slate-400">{{ user.email }}</p>
                                                 </div>
                                             </div>
                                         </td>
                                         <td class="px-4 py-4 whitespace-nowrap">
-                                            <span :class="['rounded-lg px-2.5 py-1 text-[10px] font-bold capitalize', roleBadgeClasses(user.role)]">
-                                                {{ user.role }}
-                                            </span>
+                                            <!-- Thay đổi vai trò qua dropdown gọn gàng -->
+                                            <select
+                                                :value="user.role"
+                                                :disabled="user.id === currentUser?.id"
+                                                @change="handleRoleChange(user, $event.target.value)"
+                                                :class="[
+                                                    'h-7 rounded-lg px-2 py-0.5 text-[11px] font-bold border-0 cursor-pointer capitalize focus:ring-2 focus:ring-indigo-300 disabled:opacity-60 disabled:cursor-not-allowed',
+                                                    roleBadgeClasses(user.role)
+                                                ]">
+                                                <option value="user">User</option>
+                                                <option value="editor">Editor</option>
+                                                <option value="admin">Admin</option>
+                                            </select>
                                         </td>
                                         <td class="px-4 py-4 whitespace-nowrap">
-                                            <button @click="user.is_active = !user.is_active"
+                                            <button
+                                                @click="handleToggleUserStatus(user)"
+                                                :disabled="user.id === currentUser?.id"
+                                                :title="user.id === currentUser?.id ? 'Không thể tự khóa tài khoản của bạn' : (user.is_active ? 'Nhấp để khóa tài khoản' : 'Nhấp để kích hoạt tài khoản')"
                                                 :class="[
-                                                    'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold transition hover:opacity-80',
+                                                    'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold transition hover:opacity-80 disabled:opacity-60 disabled:cursor-not-allowed',
                                                     user.is_active
                                                         ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/60'
                                                         : 'bg-rose-50 text-rose-700 ring-1 ring-rose-200/60'
@@ -1203,13 +1348,25 @@ onBeforeUnmount(() => window.clearTimeout(flashTimer))
                                         <td class="px-4 py-4 whitespace-nowrap text-slate-500 text-[11px]">
                                             {{ formatDateShort(user.created_at) }}
                                         </td>
+                                        <td class="px-4 py-4 whitespace-nowrap text-center">
+                                            <button
+                                                v-if="user.id !== currentUser?.id"
+                                                @click="askDelete('user', user)"
+                                                title="Xóa tài khoản người dùng"
+                                                class="inline-flex size-7 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition">
+                                                <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                                </svg>
+                                            </button>
+                                            <span v-else class="text-[11px] text-slate-400 italic">—</span>
+                                        </td>
                                         <td class="px-6 py-4 text-end font-mono text-[11px] text-slate-400">
                                             #US-{{ String(user.id).padStart(3, '0') }}
                                         </td>
                                     </tr>
 
                                     <tr v-if="!filteredUsers.length">
-                                        <td colspan="5" class="py-14 text-center text-slate-400">
+                                        <td colspan="6" class="py-14 text-center text-slate-400">
                                             Không tìm thấy tài khoản người dùng phù hợp.
                                         </td>
                                     </tr>
@@ -1220,6 +1377,84 @@ onBeforeUnmount(() => window.clearTimeout(flashTimer))
                 </template>
             </main>
         </div>
+
+        <!-- ================= MODAL THÊM TÀI KHOẢN NGƯỜI DÙNG ================= -->
+        <Transition name="fade">
+            <div v-if="userModal"
+                class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm"
+                @click.self="userModal = false">
+                <form class="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl border border-slate-100"
+                    @submit.prevent="saveUser">
+                    <!-- Modal Header -->
+                    <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4.5 bg-slate-50/50">
+                        <div>
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-600">Phân quyền hệ thống</span>
+                            <h3 class="font-display text-lg font-bold text-slate-900">Thêm người dùng mới</h3>
+                        </div>
+                        <button type="button" @click="userModal = false"
+                            class="flex size-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+                            ✕
+                        </button>
+                    </div>
+
+                    <!-- Modal Body -->
+                    <div class="p-6 space-y-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1.5">Họ và tên <span class="text-rose-500">*</span></label>
+                            <input v-model.trim="userForm.name" required maxlength="100"
+                                class="h-10 w-full rounded-xl border border-slate-200 px-3 text-xs placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                                placeholder="Ví dụ: Nguyễn Văn A" />
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1.5">Địa chỉ Email <span class="text-rose-500">*</span></label>
+                            <input v-model.trim="userForm.email" type="email" required maxlength="191"
+                                class="h-10 w-full rounded-xl border border-slate-200 px-3 text-xs placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                                placeholder="name@example.com" />
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1.5">Mật khẩu khởi tạo <span class="text-rose-500">*</span></label>
+                            <input v-model="userForm.password" type="password" required minlength="6"
+                                class="h-10 w-full rounded-xl border border-slate-200 px-3 text-xs placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                                placeholder="Tối thiểu 6 ký tự..." />
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1.5">Vai trò (Role) <span class="text-rose-500">*</span></label>
+                                <select v-model="userForm.role" required
+                                    class="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-700 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100">
+                                    <option value="user">Người dùng (User)</option>
+                                    <option value="editor">Biên tập viên (Editor)</option>
+                                    <option value="admin">Quản trị viên (Admin)</option>
+                                </select>
+                            </div>
+
+                            <div class="flex items-center gap-2 pt-6">
+                                <label class="relative inline-flex cursor-pointer items-center">
+                                    <input v-model="userForm.is_active" type="checkbox" class="peer sr-only" />
+                                    <div class="peer h-5 w-9 rounded-full bg-slate-200 after:absolute after:start-[2px] after:top-[2px] after:size-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:bg-emerald-500 peer-checked:after:translate-x-full"></div>
+                                    <span class="ms-2.5 text-xs font-semibold text-slate-700">Kích hoạt tài khoản ngay</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Modal Footer -->
+                    <div class="flex items-center justify-end gap-2.5 border-t border-slate-100 bg-slate-50/50 px-6 py-4">
+                        <button type="button" @click="userModal = false"
+                            class="h-9.5 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition">
+                            Hủy bỏ
+                        </button>
+                        <button type="submit"
+                            class="h-9.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 px-5 text-xs font-bold text-white shadow-md shadow-indigo-600/25 hover:brightness-110 transition">
+                            Tạo tài khoản
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </Transition>
 
         <!-- ================= MODAL THÊM / SỬA DANH MỤC ================= -->
         <Transition name="fade">
@@ -1278,9 +1513,16 @@ onBeforeUnmount(() => window.clearTimeout(flashTimer))
 
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-1.5">Mô tả danh mục</label>
-                            <textarea v-model.trim="categoryForm.description" rows="3" maxlength="255"
-                                class="w-full rounded-xl border border-slate-200 p-3 text-xs placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                                placeholder="Mô tả ngắn gọn về chủ đề bài viết thuộc danh mục này..."></textarea>
+                            <div class="quill-wrapper rounded-xl border border-slate-200 overflow-hidden bg-white focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100">
+                                <QuillEditor
+                                    v-model:content="categoryForm.description"
+                                    contentType="html"
+                                    theme="snow"
+                                    :toolbar="[['bold', 'italic', 'underline'], [{ 'list': 'ordered'}, { 'list': 'bullet' }], ['clean']]"
+                                    placeholder="Mô tả ngắn gọn về chủ đề bài viết thuộc danh mục này..."
+                                    style="min-height: 80px;"
+                                />
+                            </div>
                         </div>
 
                         <div class="flex items-center gap-2 pt-1">
@@ -1387,16 +1629,39 @@ onBeforeUnmount(() => window.clearTimeout(flashTimer))
 
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-1.5">Mô tả ngắn (Lead)</label>
-                            <textarea v-model="articleForm.summary" rows="2"
-                                class="w-full rounded-xl border border-slate-200 p-3 text-xs placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                                placeholder="Tóm tắt ngắn 1-2 câu hiển thị ở danh sách bài viết..."></textarea>
+                            <div class="quill-wrapper rounded-xl border border-slate-200 overflow-hidden bg-white focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100">
+                                <QuillEditor
+                                    v-model:content="articleForm.summary"
+                                    contentType="html"
+                                    theme="snow"
+                                    :toolbar="[['bold', 'italic', 'underline'], ['clean']]"
+                                    placeholder="Tóm tắt ngắn 1-2 câu hiển thị ở danh sách bài viết..."
+                                    style="min-height: 80px;"
+                                />
+                            </div>
                         </div>
 
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-1.5">Nội dung bài viết đầy đủ</label>
-                            <textarea v-model="articleForm.content" rows="4"
-                                class="w-full rounded-xl border border-slate-200 p-3 text-xs leading-relaxed placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                                placeholder="Dán nội dung chi tiết bài báo tại đây..."></textarea>
+                            <div class="quill-wrapper rounded-xl border border-slate-200 overflow-hidden bg-white focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100">
+                                <QuillEditor
+                                    v-model:content="articleForm.content"
+                                    contentType="html"
+                                    theme="snow"
+                                    :toolbar="[
+                                        [{ 'header': [1, 2, 3, false] }],
+                                        ['bold', 'italic', 'underline', 'strike'],
+                                        [{ 'color': [] }, { 'background': [] }],
+                                        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                                        [{ 'align': [] }],
+                                        ['blockquote', 'code-block'],
+                                        ['link', 'image'],
+                                        ['clean']
+                                    ]"
+                                    placeholder="Soạn thảo hoặc dán nội dung chi tiết bài báo tại đây..."
+                                    style="min-height: 220px;"
+                                />
+                            </div>
                         </div>
 
                         <!-- Cấu hình Trí Tuệ Nhân Tạo AI & TTS Audio -->
@@ -1408,16 +1673,30 @@ onBeforeUnmount(() => window.clearTimeout(flashTimer))
 
                             <div>
                                 <label class="block text-[11px] font-semibold text-slate-700 mb-1">Tóm tắt tự động bằng AI (3 câu cốt lõi)</label>
-                                <textarea v-model="articleForm.ai_summary" rows="2"
-                                    class="w-full rounded-lg border border-slate-200 bg-white p-2.5 text-xs placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                                    placeholder="Nội dung tóm tắt súc tích do AI phân tích để độc giả đọc nhanh trong 30 giây..."></textarea>
+                                <div class="quill-wrapper rounded-lg border border-slate-200 overflow-hidden bg-white focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100">
+                                    <QuillEditor
+                                        v-model:content="articleForm.ai_summary"
+                                        contentType="html"
+                                        theme="snow"
+                                        :toolbar="[['bold', 'italic'], [{ 'list': 'bullet' }], ['clean']]"
+                                        placeholder="Nội dung tóm tắt súc tích do AI phân tích để độc giả đọc nhanh trong 30 giây..."
+                                        style="min-height: 75px;"
+                                    />
+                                </div>
                             </div>
 
                             <div>
                                 <label class="block text-[11px] font-semibold text-slate-700 mb-1">Văn bản chuẩn hóa cho TTS Audio</label>
-                                <textarea v-model="articleForm.content_tts" rows="2"
-                                    class="w-full rounded-lg border border-slate-200 bg-white p-2.5 text-xs placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                                    placeholder="Văn bản đã qua tiền xử lý dấu câu để giọng đọc AI phát âm tự nhiên nhất..."></textarea>
+                                <div class="quill-wrapper rounded-lg border border-slate-200 overflow-hidden bg-white focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100">
+                                    <QuillEditor
+                                        v-model:content="articleForm.content_tts"
+                                        contentType="html"
+                                        theme="snow"
+                                        :toolbar="[['bold', 'italic'], ['clean']]"
+                                        placeholder="Văn bản đã qua tiền xử lý dấu câu để giọng đọc AI phát âm tự nhiên nhất..."
+                                        style="min-height: 75px;"
+                                    />
+                                </div>
                             </div>
                         </div>
 
@@ -1512,5 +1791,53 @@ onBeforeUnmount(() => window.clearTimeout(flashTimer))
 .notice-leave-to {
     opacity: 0;
     transform: translateY(12px);
+}
+
+/* ─── Tùy biến Quill Editor hiện đại ────────────────────────────────────────── */
+:deep(.quill-wrapper .ql-toolbar.ql-snow) {
+    border: none;
+    border-bottom: 1px solid #f1f5f9;
+    background-color: #f8fafc;
+    padding: 6px 10px;
+    border-top-left-radius: 0.75rem;
+    border-top-right-radius: 0.75rem;
+}
+:deep(.quill-wrapper .ql-container.ql-snow) {
+    border: none;
+    font-size: 0.8125rem;
+    font-family: inherit;
+    color: #1e293b;
+    border-bottom-left-radius: 0.75rem;
+    border-bottom-right-radius: 0.75rem;
+}
+:deep(.quill-wrapper .ql-editor) {
+    min-height: inherit;
+    padding: 10px 14px;
+    line-height: 1.6;
+}
+:deep(.quill-wrapper .ql-editor.ql-blank::before) {
+    font-style: normal;
+    color: #94a3b8;
+    font-size: 0.8125rem;
+    left: 14px;
+}
+:deep(.quill-wrapper .ql-snow .ql-picker) {
+    font-size: 0.75rem;
+}
+:deep(.quill-wrapper .ql-snow .ql-stroke) {
+    stroke: #64748b;
+}
+:deep(.quill-wrapper .ql-snow .ql-fill) {
+    fill: #64748b;
+}
+:deep(.quill-wrapper .ql-snow button:hover .ql-stroke),
+:deep(.quill-wrapper .ql-snow .ql-picker:hover .ql-stroke),
+:deep(.quill-wrapper .ql-snow button.ql-active .ql-stroke) {
+    stroke: #4f46e5;
+}
+:deep(.quill-wrapper .ql-snow button:hover .ql-fill),
+:deep(.quill-wrapper .ql-snow .ql-picker:hover .ql-fill),
+:deep(.quill-wrapper .ql-snow button.ql-active .ql-fill) {
+    fill: #4f46e5;
 }
 </style>
