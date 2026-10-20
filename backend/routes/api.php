@@ -34,6 +34,7 @@ Route::middleware(['auth:sanctum', 'role:admin,editor'])->prefix('admin')->group
     Route::prefix('categories')->group(function () {
         Route::get('/', [CategoriesController::class, 'index']);
         Route::post('/', [CategoriesController::class, 'store']);
+        Route::match(['post', 'delete'], '/bulk-delete', [CategoriesController::class, 'bulkDestroy']);
         Route::get('/{id}', [CategoriesController::class, 'show']);
         Route::put('/{id}', [CategoriesController::class, 'update']);
         Route::patch('/{id}/toggle-status', [CategoriesController::class, 'toggleStatus']);
@@ -44,6 +45,7 @@ Route::middleware(['auth:sanctum', 'role:admin,editor'])->prefix('admin')->group
     Route::prefix('users')->middleware('role:admin')->group(function () {
         Route::get('/', [UserController::class, 'index']);
         Route::post('/', [UserController::class, 'store']);
+        Route::match(['post', 'delete'], '/bulk-delete', [UserController::class, 'bulkDestroy']);
         Route::patch('/{id}/toggle-status', [UserController::class, 'toggleStatus']);
         Route::patch('/{id}/role', [UserController::class, 'updateRole']);
         Route::delete('/{id}', [UserController::class, 'destroy']);
@@ -53,6 +55,7 @@ Route::middleware(['auth:sanctum', 'role:admin,editor'])->prefix('admin')->group
     Route::prefix('articles')->group(function () {
         Route::get('/', [ArticlesController::class, 'index']);
         Route::post('/', [ArticlesController::class, 'store']);
+        Route::match(['post', 'delete'], '/bulk-delete', [ArticlesController::class, 'bulkDestroy']);
         Route::get('/{id}', [ArticlesController::class, 'show']);
         Route::post('/{id}', [ArticlesController::class, 'update']);     // POST thay PUT (multipart)
         Route::patch('/{id}/toggle-publish', [ArticlesController::class, 'togglePublish']);

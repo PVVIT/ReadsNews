@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { auth } from '@/utils/auth'
 import { userService } from '@/services/userService'
 import { categoryService } from '@/services/categoryService'
@@ -24,6 +24,77 @@ const editingId = ref(null)
 const flashMessage = ref('')
 let flashTimer
 
+// Danh sách ID được chọn để thao tác hàng loạt
+const selectedArticles = ref([])
+const selectedCategories = ref([])
+const selectedUsers = ref([])
+
+// Check all Articles trên trang hiện tại
+const isAllArticlesSelected = computed(() => {
+    return filteredArticles.value.length > 0 && filteredArticles.value.every(a => selectedArticles.value.includes(a.id))
+})
+function toggleSelectAllArticles(e) {
+    if (e.target.checked) {
+        const pageIds = filteredArticles.value.map(a => a.id)
+        selectedArticles.value = Array.from(new Set([...selectedArticles.value, ...pageIds]))
+    } else {
+        const pageIds = new Set(filteredArticles.value.map(a => a.id))
+        selectedArticles.value = selectedArticles.value.filter(id => !pageIds.has(id))
+    }
+}
+
+// Check all Categories trên trang hiện tại
+const isAllCategoriesSelected = computed(() => {
+    return filteredCategories.value.length > 0 && filteredCategories.value.every(c => selectedCategories.value.includes(c.id))
+})
+function toggleSelectAllCategories(e) {
+    if (e.target.checked) {
+        const pageIds = filteredCategories.value.map(c => c.id)
+        selectedCategories.value = Array.from(new Set([...selectedCategories.value, ...pageIds]))
+    } else {
+        const pageIds = new Set(filteredCategories.value.map(c => c.id))
+        selectedCategories.value = selectedCategories.value.filter(id => !pageIds.has(id))
+    }
+}
+
+// Check all Users trên trang hiện tại (trừ tài khoản của chính mình)
+const isAllUsersSelected = computed(() => {
+    const selectable = filteredUsers.value.filter(u => u.id !== currentUser.value?.id)
+    return selectable.length > 0 && selectable.every(u => selectedUsers.value.includes(u.id))
+})
+function toggleSelectAllUsers(e) {
+    if (e.target.checked) {
+        const pageIds = filteredUsers.value.filter(u => u.id !== currentUser.value?.id).map(u => u.id)
+        selectedUsers.value = Array.from(new Set([...selectedUsers.value, ...pageIds]))
+    } else {
+        const pageIds = new Set(filteredUsers.value.map(u => u.id))
+        selectedUsers.value = selectedUsers.value.filter(id => !pageIds.has(id))
+    }
+}
+
+function askBulkDelete(section) {
+    let ids = []
+    let type = ''
+    if (section === 'articles') {
+        ids = [...selectedArticles.value]
+        type = 'bulk-articles'
+    } else if (section === 'categories') {
+        ids = [...selectedCategories.value]
+        type = 'bulk-categories'
+    } else if (section === 'users') {
+        ids = [...selectedUsers.value]
+        type = 'bulk-users'
+    }
+
+    if (!ids.length) return
+
+    deleteTarget.value = {
+        type,
+        count: ids.length,
+        ids
+    }
+}
+
 // Lấy thông tin tài khoản hiện tại từ auth utils hoặc fallback mặc định
 const currentUser = computed(() => {
     return auth.getUser() || { id: null, name: 'Admin ReadsNews', email: 'admin@readsnews.vn', role: 'admin' }
@@ -31,6 +102,7 @@ const currentUser = computed(() => {
 
 // Quản lý danh mục thực tế từ Database
 const categories = ref([])
+const allCategories = ref([])
 const isCategoriesLoading = ref(false)
 const categoriesMeta = ref({ total: 0, per_page: 10, current_page: 1, last_page: 1 })
 
@@ -89,29 +161,9 @@ const totalListens = computed(() => articles.value.reduce((sum, article) => sum 
 const publishedCount = computed(() => articles.value.filter((article) => article.published_at).length)
 const activeUserCount = computed(() => users.value.filter((user) => user.is_active).length)
 
-const filteredArticles = computed(() => articles.value.filter((article) => {
-    const matchesCategory = selectedCategory.value === 'all' || article.category_id === Number(selectedCategory.value)
-    const matchesStatus = selectedStatus.value === 'all'
-        ? true
-        : selectedStatus.value === 'published' ? !!article.published_at : !article.published_at
-    const term = search.value.trim().toLocaleLowerCase('vi')
-    const matchesSearch = !term || `${article.title} ${article.author || ''} ${sourceName(article.source_id)}`.toLocaleLowerCase('vi').includes(term)
-    return matchesCategory && matchesStatus && matchesSearch
-}))
-
-const filteredCategories = computed(() => {
-    const term = search.value.trim().toLocaleLowerCase('vi')
-    return categories.value.filter((category) => !term || `${category.name} ${category.slug} ${category.description || ''}`.toLocaleLowerCase('vi').includes(term))
-})
-
-const filteredUsers = computed(() => {
-    const term = search.value.trim().toLocaleLowerCase('vi')
-    return users.value.filter((user) => {
-        const matchesRole = selectedRole.value === 'all' || user.role === selectedRole.value
-        const matchesSearch = !term || `${user.name} ${user.email} ${user.role}`.toLocaleLowerCase('vi').includes(term)
-        return matchesRole && matchesSearch
-    })
-})
+const filteredArticles = computed(() => articles.value)
+const filteredCategories = computed(() => categories.value)
+const filteredUsers = computed(() => users.value)
 
 function emptyCategory() {
     return {
@@ -119,7 +171,7 @@ function emptyCategory() {
         name: '',
         slug: '',
         description: '',
-        sort_order: (categories.value?.length || 0) + 1,
+        sort_order: (allCategories.value?.length || categories.value?.length || 0) + 1,
         is_active: true
     }
 }
@@ -179,7 +231,9 @@ function sourceName(id) {
 }
 
 function categoryName(id) {
-    return categories.value.find((category) => category.id === Number(id))?.name || 'Chưa phân loại'
+    if (!id) return 'Chưa phân loại'
+    const list = allCategories.value.length ? allCategories.value : categories.value
+    return list.find((category) => category.id === Number(id))?.name || 'Chưa phân loại'
 }
 
 function categoryCount(id) {
@@ -192,17 +246,41 @@ function notify(message) {
     flashTimer = window.setTimeout(() => { flashMessage.value = '' }, 3000)
 }
 
+let searchDebounceTimer = null
+watch([search, selectedCategory, selectedStatus, selectedRole], () => {
+    clearTimeout(searchDebounceTimer)
+    searchDebounceTimer = setTimeout(() => {
+        if (activeSection.value === 'articles') {
+            fetchArticles(1)
+        } else if (activeSection.value === 'categories') {
+            fetchCategories(1)
+        } else if (activeSection.value === 'users') {
+            fetchUsers(1)
+        }
+    }, 300)
+})
+
 function setSection(section) {
     activeSection.value = section
     search.value = ''
     selectedCategory.value = 'all'
     selectedStatus.value = 'all'
     selectedRole.value = 'all'
+    selectedArticles.value = []
+    selectedCategories.value = []
+    selectedUsers.value = []
+    if (section === 'articles') {
+        fetchArticles(1)
+    } else if (section === 'categories') {
+        fetchCategories(1)
+    } else if (section === 'users') {
+        fetchUsers(1)
+    }
 }
 
 function openCategoryForm(category = null) {
     editingId.value = category?.id ?? null
-    categoryForm.value = category ? { ...category, parent_id: category.parent_id ?? '' } : emptyCategory()
+    categoryForm.value = category ? { ...category, parent_id: category.parent_id ?? '', description: category.description ?? '' } : emptyCategory()
     categoryModal.value = true
 }
 
@@ -217,10 +295,20 @@ async function saveCategory() {
     try {
         if (editingId.value) {
             const res = await categoryService.updateCategory(editingId.value, record)
-            if (res?.success) { notify(res.message || 'Đã cập nhật danh mục thành công!'); categoryModal.value = false; await fetchCategories() }
+            if (res?.success) {
+                notify(res.message || 'Đã cập nhật danh mục thành công!')
+                categoryModal.value = false
+                await fetchCategories(categoriesMeta.value.current_page)
+                await fetchAllCategories()
+            }
         } else {
             const res = await categoryService.createCategory(record)
-            if (res?.success) { notify(res.message || 'Đã thêm danh mục mới thành công!'); categoryModal.value = false; await fetchCategories() }
+            if (res?.success) {
+                notify(res.message || 'Đã thêm danh mục mới thành công!')
+                categoryModal.value = false
+                await fetchCategories(1)
+                await fetchAllCategories()
+            }
         }
     } catch (err) {
         notify(err.response?.data?.message || 'Có lỗi xảy ra khi lưu danh mục.')
@@ -228,14 +316,59 @@ async function saveCategory() {
     }
 }
 
-function openArticleForm(article = null) {
+async function openArticleForm(article = null) {
     editingId.value = article?.id ?? null
-    articleForm.value = article
-        ? { ...article, source_id: article.source_id ? String(article.source_id) : '', category_id: article.category_id ? String(article.category_id) : '', published_at: article.published_at ? article.published_at.slice(0, 16) : '' }
-        : emptyArticle()
     thumbnailFile.value = null
-    thumbnailPreview.value = article?.thumbnail || null
-    articleModal.value = true
+
+    if (article) {
+        articleForm.value = {
+            ...emptyArticle(),
+            ...article,
+            summary: article.summary ?? '',
+            content: article.content ?? '',
+            ai_summary: article.ai_summary ?? '',
+            content_tts: article.content_tts ?? '',
+            original_url: article.original_url ?? '',
+            author: article.author ?? '',
+            source_id: article.source_id ? String(article.source_id) : '',
+            category_id: article.category_id ? String(article.category_id) : '',
+            published_at: article.published_at ? article.published_at.slice(0, 16) : ''
+        }
+        thumbnailPreview.value = article.thumbnail || null
+        articleModal.value = true
+
+        // Nếu thiếu content, fetch thêm từ server để hiển thị đầy đủ
+        if (!article.content) {
+            try {
+                const res = await articleService.getArticle(article.id)
+                if (res?.data) {
+                    const full = res.data
+                    articleForm.value = {
+                        ...articleForm.value,
+                        ...full,
+                        summary: full.summary ?? articleForm.value.summary,
+                        content: full.content ?? articleForm.value.content,
+                        ai_summary: full.ai_summary ?? articleForm.value.ai_summary,
+                        content_tts: full.content_tts ?? articleForm.value.content_tts,
+                        original_url: full.original_url ?? articleForm.value.original_url,
+                        author: full.author ?? articleForm.value.author,
+                        source_id: full.source_id ? String(full.source_id) : articleForm.value.source_id,
+                        category_id: full.category_id ? String(full.category_id) : articleForm.value.category_id,
+                        published_at: full.published_at ? full.published_at.slice(0, 16) : articleForm.value.published_at
+                    }
+                    if (!thumbnailFile.value && full.thumbnail) {
+                        thumbnailPreview.value = full.thumbnail
+                    }
+                }
+            } catch (err) {
+                console.error('Lỗi khi tải chi tiết bài viết:', err)
+            }
+        }
+    } else {
+        articleForm.value = emptyArticle()
+        thumbnailPreview.value = null
+        articleModal.value = true
+    }
 }
 
 function onThumbnailChange(event) {
@@ -292,20 +425,23 @@ function askDelete(type, record) {
 }
 
 async function confirmDelete() {
-    const { type, record } = deleteTarget.value
+    const { type, record, ids, count } = deleteTarget.value
     if (type === 'article') {
         try {
             await articleService.deleteArticle(record.id)
+            selectedArticles.value = selectedArticles.value.filter(id => id !== record.id)
             notify('Đã xóa bài báo thành công.')
-            await fetchArticles()
+            await fetchArticles(articlesMeta.value.current_page)
         } catch (err) {
             notify(err.response?.data?.message || 'Lỗi khi xóa bài báo.')
         }
     } else if (type === 'category') {
         try {
             await categoryService.deleteCategory(record.id)
+            selectedCategories.value = selectedCategories.value.filter(id => id !== record.id)
             notify(`Đã xóa danh mục "${record.name}" thành công.`)
-            await fetchCategories()
+            await fetchCategories(categoriesMeta.value.current_page)
+            await fetchAllCategories()
         } catch (err) {
             notify(err.response?.data?.message || 'Lỗi khi xóa danh mục.')
             console.error('Lỗi khi xóa danh mục:', err)
@@ -313,20 +449,57 @@ async function confirmDelete() {
     } else if (type === 'user') {
         try {
             await userService.deleteUser(record.id)
-            users.value = users.value.filter((u) => u.id !== record.id)
+            selectedUsers.value = selectedUsers.value.filter(id => id !== record.id)
             notify(`Đã xóa tài khoản ${record.name} thành công.`)
+            await fetchUsers(usersMeta.value.current_page)
         } catch (err) {
             console.error('Lỗi khi xóa người dùng:', err)
+        }
+    } else if (type === 'bulk-articles') {
+        try {
+            const res = await articleService.bulkDeleteArticles(ids)
+            notify(res.message || `Đã xóa ${count} bài báo thành công.`)
+            selectedArticles.value = []
+            await fetchArticles(articlesMeta.value.current_page)
+        } catch (err) {
+            notify(err.response?.data?.message || 'Lỗi khi xóa các bài báo đã chọn.')
+        }
+    } else if (type === 'bulk-categories') {
+        try {
+            const res = await categoryService.bulkDeleteCategories(ids)
+            notify(res.message || `Đã xóa ${count} danh mục thành công.`)
+            selectedCategories.value = []
+            await fetchCategories(categoriesMeta.value.current_page)
+            await fetchAllCategories()
+        } catch (err) {
+            notify(err.response?.data?.message || 'Lỗi khi xóa các danh mục đã chọn.')
+        }
+    } else if (type === 'bulk-users') {
+        try {
+            const res = await userService.bulkDeleteUsers(ids)
+            notify(res.message || `Đã xóa ${count} người dùng thành công.`)
+            selectedUsers.value = []
+            await fetchUsers(usersMeta.value.current_page)
+        } catch (err) {
+            notify(err.response?.data?.message || 'Lỗi khi xóa các người dùng đã chọn.')
         }
     }
     deleteTarget.value = null
 }
 
 // ─── API Bài Báo (Articles) ──────────────────────────────────────────────────
-async function fetchArticles(page = articlesMeta.value.current_page, params = {}) {
+async function fetchArticles(page = 1, params = {}) {
     isArticlesLoading.value = true
     try {
-        const res = await articleService.getArticles({ per_page: 10, page, ...params })
+        const queryParams = {
+            per_page: 10,
+            page,
+            search: search.value.trim() || undefined,
+            category_id: selectedCategory.value !== 'all' ? selectedCategory.value : undefined,
+            status: selectedStatus.value !== 'all' ? selectedStatus.value : undefined,
+            ...params
+        }
+        const res = await articleService.getArticles(queryParams)
         if (res?.success) {
             articles.value = res.data || []
             if (res.meta) articlesMeta.value = res.meta
@@ -380,10 +553,18 @@ async function handleCrawlRss(sourceId) {
 }
 
 // ─── API Người Dùng (Users) ──────────────────────────────────────────────────
-async function fetchUsers(page = 1) {
+async function fetchUsers(page = 1, params = {}) {
     isUsersLoading.value = true
     try {
-        const res = await userService.getUsers({ per_page: 10, page })
+        const queryParams = {
+            per_page: 10,
+            page,
+            search: search.value.trim() || undefined,
+            role: selectedRole.value !== 'all' ? selectedRole.value : undefined,
+            status: selectedStatus.value !== 'all' ? selectedStatus.value : undefined,
+            ...params
+        }
+        const res = await userService.getUsers(queryParams)
         if (res?.success) {
             users.value = res.data || []
             if (res.meta) usersMeta.value = res.meta
@@ -423,16 +604,23 @@ async function saveUser() {
             userModal.value = false
             userForm.value = { name: '', email: '', password: '', role: 'user', is_active: true }
             notify('Đã thêm người dùng mới thành công!')
-            await fetchUsers()
+            await fetchUsers(1)
         }
     } catch (err) { console.error('Lỗi tạo người dùng:', err) }
 }
 
 // ─── API Danh Mục (Categories) ────────────────────────────────────────────────
-async function fetchCategories(page = 1) {
+async function fetchCategories(page = 1, params = {}) {
     isCategoriesLoading.value = true
     try {
-        const res = await categoryService.getCategories({ per_page: 10, page })
+        const queryParams = {
+            per_page: 10,
+            page,
+            search: search.value.trim() || undefined,
+            status: selectedStatus.value !== 'all' ? selectedStatus.value : undefined,
+            ...params
+        }
+        const res = await categoryService.getCategories(queryParams)
         if (res?.success) {
             categories.value = res.data || []
             if (res.meta) categoriesMeta.value = res.meta
@@ -444,10 +632,25 @@ async function fetchCategories(page = 1) {
     }
 }
 
+async function fetchAllCategories() {
+    try {
+        const res = await categoryService.getCategories({ all: 1 })
+        if (res?.success) {
+            allCategories.value = res.data || []
+        }
+    } catch (err) {
+        console.error('Lỗi khi tải toàn bộ danh mục:', err)
+    }
+}
+
 async function handleToggleCategoryStatus(category) {
     try {
         const res = await categoryService.toggleStatus(category.id)
-        if (res?.success) { category.is_active = res.data.is_active; notify(res.message || 'Cập nhật trạng thái danh mục thành công!') }
+        if (res?.success) {
+            category.is_active = res.data.is_active
+            notify(res.message || 'Cập nhật trạng thái danh mục thành công!')
+            await fetchAllCategories()
+        }
     } catch (err) {
         notify('Không thể cập nhật trạng thái danh mục.')
         console.error('Lỗi đổi trạng thái danh mục:', err)
@@ -467,9 +670,10 @@ function roleBadgeClasses(role) {
 }
 
 onMounted(() => {
-    fetchUsers()
-    fetchCategories()
-    fetchArticles()
+    fetchUsers(1)
+    fetchCategories(1)
+    fetchAllCategories()
+    fetchArticles(1)
     fetchSources()
 })
 
@@ -1095,7 +1299,7 @@ onBeforeUnmount(() => window.clearTimeout(flashTimer))
                                 <select v-model="selectedCategory"
                                     class="h-9 rounded-xl border border-slate-200 bg-slate-50/60 px-3 text-xs font-medium text-slate-700 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100">
                                     <option value="all">Tất cả danh mục</option>
-                                    <option v-for="category in categories" :key="category.id"
+                                    <option v-for="category in (allCategories.length ? allCategories : categories)" :key="category.id"
                                         :value="String(category.id)">{{ category.name }}</option>
                                 </select>
 
@@ -1152,12 +1356,39 @@ onBeforeUnmount(() => window.clearTimeout(flashTimer))
                             </div>
                         </div>
 
+                        <!-- Thanh tác vụ xóa nhiều bài báo -->
+                        <div v-if="selectedArticles.length > 0"
+                            class="flex items-center justify-between border-b border-indigo-100 bg-indigo-50/70 px-6 py-2.5 text-xs transition-all">
+                            <div class="flex items-center gap-2 text-indigo-950 font-semibold">
+                                <span class="flex size-5 items-center justify-center rounded-full bg-indigo-600 text-white text-[10px] font-bold">{{ selectedArticles.length }}</span>
+                                <span>bài báo đã được chọn</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button type="button" @click="selectedArticles = []" class="px-2.5 py-1 text-slate-500 hover:text-slate-700 font-medium transition">
+                                    Bỏ chọn
+                                </button>
+                                <button type="button" @click="askBulkDelete('articles')"
+                                    class="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-rose-700 transition active:scale-95">
+                                    <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                        <line x1="10" y1="11" x2="10" y2="17" />
+                                        <line x1="14" y1="11" x2="14" y2="17" />
+                                    </svg>
+                                    Xóa {{ selectedArticles.length }} bài đã chọn
+                                </button>
+                            </div>
+                        </div>
+
                         <!-- Data Table -->
                         <div class="overflow-x-auto">
                             <table class="w-full text-start text-xs">
                                 <thead>
                                     <tr
                                         class="border-b border-slate-100 bg-slate-50/70 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                                        <th class="w-11 px-4 py-3.5 text-center">
+                                            <input type="checkbox" :checked="isAllArticlesSelected" @change="toggleSelectAllArticles"
+                                                class="size-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" />
+                                        </th>
                                         <th class="px-6 py-3.5 text-start">Bài báo</th>
                                         <th class="px-4 py-3.5 text-start">Danh mục</th>
                                         <th class="px-4 py-3.5 text-start">Nguồn</th>
@@ -1170,7 +1401,7 @@ onBeforeUnmount(() => window.clearTimeout(flashTimer))
                                 <tbody class="divide-y divide-slate-100">
                                     <!-- Loading state -->
                                     <tr v-if="isArticlesLoading">
-                                        <td colspan="7" class="py-14 text-center text-slate-400">
+                                        <td colspan="8" class="py-14 text-center text-slate-400">
                                             <div class="inline-flex items-center gap-2 font-medium">
                                                 <svg class="size-4 animate-spin text-sky-500" viewBox="0 0 24 24"
                                                     fill="none">
@@ -1185,7 +1416,13 @@ onBeforeUnmount(() => window.clearTimeout(flashTimer))
                                     </tr>
 
                                     <tr v-if="!isArticlesLoading" v-for="article in filteredArticles" :key="article.id"
-                                        class="transition hover:bg-slate-50/80">
+                                        :class="['transition hover:bg-slate-50/80', selectedArticles.includes(article.id) ? 'bg-indigo-50/30' : '']">
+                                        <!-- Ô chọn hàng loạt -->
+                                        <td class="w-11 px-4 py-4 text-center">
+                                            <input type="checkbox" :value="article.id" v-model="selectedArticles"
+                                                class="size-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" />
+                                        </td>
+
                                         <!-- Tiêu đề + Thumbnail -->
                                         <td class="px-6 py-4 max-w-sm">
                                             <div class="flex items-center gap-3">
@@ -1286,7 +1523,7 @@ onBeforeUnmount(() => window.clearTimeout(flashTimer))
 
                                     <!-- Empty state -->
                                     <tr v-if="!isArticlesLoading && !filteredArticles.length">
-                                        <td colspan="7" class="py-16 text-center text-slate-400">
+                                        <td colspan="8" class="py-16 text-center text-slate-400">
                                             <div class="flex flex-col items-center justify-center">
                                                 <svg class="size-10 text-slate-300 mb-2" viewBox="0 0 24 24" fill="none"
                                                     stroke="currentColor" stroke-width="1.5">
@@ -1362,11 +1599,38 @@ onBeforeUnmount(() => window.clearTimeout(flashTimer))
                             </div>
                         </div>
 
+                        <!-- Thanh tác vụ xóa nhiều danh mục -->
+                        <div v-if="selectedCategories.length > 0"
+                            class="flex items-center justify-between border-b border-indigo-100 bg-indigo-50/70 px-6 py-2.5 text-xs transition-all">
+                            <div class="flex items-center gap-2 text-indigo-950 font-semibold">
+                                <span class="flex size-5 items-center justify-center rounded-full bg-indigo-600 text-white text-[10px] font-bold">{{ selectedCategories.length }}</span>
+                                <span>danh mục đã được chọn</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button type="button" @click="selectedCategories = []" class="px-2.5 py-1 text-slate-500 hover:text-slate-700 font-medium transition">
+                                    Bỏ chọn
+                                </button>
+                                <button type="button" @click="askBulkDelete('categories')"
+                                    class="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-rose-700 transition active:scale-95">
+                                    <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                        <line x1="10" y1="11" x2="10" y2="17" />
+                                        <line x1="14" y1="11" x2="14" y2="17" />
+                                    </svg>
+                                    Xóa {{ selectedCategories.length }} danh mục đã chọn
+                                </button>
+                            </div>
+                        </div>
+
                         <div class="overflow-x-auto">
                             <table class="w-full text-start text-xs">
                                 <thead>
                                     <tr
                                         class="border-b border-slate-100 bg-slate-50/70 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                                        <th class="w-11 px-4 py-3.5 text-center">
+                                            <input type="checkbox" :checked="isAllCategoriesSelected" @change="toggleSelectAllCategories"
+                                                class="size-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" />
+                                        </th>
                                         <th class="px-6 py-3.5 text-start">Tên danh mục</th>
                                         <th class="px-4 py-3.5 text-start">Slug</th>
                                         <th class="px-4 py-3.5 text-start">Danh mục cha</th>
@@ -1377,65 +1641,8 @@ onBeforeUnmount(() => window.clearTimeout(flashTimer))
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-100">
-                                    <tr v-for="category in filteredCategories" :key="category.id"
-                                        class="transition hover:bg-slate-50/80">
-                                        <td class="px-6 py-4">
-                                            <p class="font-bold text-slate-900">{{ category.name }}</p>
-                                            <p class="mt-0.5 text-[11px] text-slate-400 max-w-xs truncate">{{
-                                                category.description || 'Chưa có mô tả' }}</p>
-                                        </td>
-                                        <td class="px-4 py-4 whitespace-nowrap">
-                                            <span
-                                                class="rounded bg-slate-100 px-2 py-0.5 font-mono text-[11px] text-slate-600">/{{
-                                                    category.slug }}</span>
-                                        </td>
-                                        <td class="px-4 py-4 whitespace-nowrap text-slate-500">
-                                            {{ category.parent_id ? categoryName(category.parent_id) : '— (Gốc)' }}
-                                        </td>
-                                        <td class="px-4 py-4 whitespace-nowrap">
-                                            <span class="font-bold text-indigo-600 tabular-nums">{{
-                                                category.articles_count ?? categoryCount(category.id) }} bài</span>
-                                        </td>
-                                        <td class="px-4 py-4 whitespace-nowrap font-medium text-slate-600 tabular-nums">
-                                            {{ category.sort_order }}
-                                        </td>
-                                        <td class="px-4 py-4 whitespace-nowrap">
-                                            <button @click="handleToggleCategoryStatus(category)" :class="[
-                                                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold transition hover:opacity-80',
-                                                category.is_active
-                                                    ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/60'
-                                                    : 'bg-slate-100 text-slate-600 ring-1 ring-slate-200/60'
-                                            ]">
-                                                <span class="size-1.5 rounded-full"
-                                                    :class="category.is_active ? 'bg-emerald-500' : 'bg-slate-400'"></span>
-                                                {{ category.is_active ? 'Đang hiển thị' : 'Đã ẩn' }}
-                                            </button>
-                                        </td>
-                                        <td class="px-6 py-4 text-end whitespace-nowrap">
-                                            <div class="flex items-center justify-end gap-1.5">
-                                                <button @click="openCategoryForm(category)" title="Sửa danh mục"
-                                                    class="flex size-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-indigo-50 hover:text-indigo-600">
-                                                    <svg class="size-4" viewBox="0 0 24 24" fill="none"
-                                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                                        stroke-linejoin="round">
-                                                        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                                                    </svg>
-                                                </button>
-                                                <button @click="askDelete('category', category)" title="Xóa danh mục"
-                                                    class="flex size-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-rose-50 hover:text-rose-600">
-                                                    <svg class="size-4" viewBox="0 0 24 24" fill="none"
-                                                        stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                                        stroke-linejoin="round">
-                                                        <path
-                                                            d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                                                    </svg>
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-
                                     <tr v-if="isCategoriesLoading">
-                                        <td colspan="7" class="py-14 text-center text-slate-400">
+                                        <td colspan="8" class="py-14 text-center text-slate-400">
                                             <div class="inline-flex items-center gap-2 font-medium">
                                                 <svg class="size-4 animate-spin text-sky-500" viewBox="0 0 24 24"
                                                     fill="none">
@@ -1448,13 +1655,106 @@ onBeforeUnmount(() => window.clearTimeout(flashTimer))
                                             </div>
                                         </td>
                                     </tr>
-                                    <tr v-else-if="!filteredCategories.length">
-                                        <td colspan="7" class="py-14 text-center text-slate-400">
-                                            Chưa có danh mục nào phù hợp với tìm kiếm.
-                                        </td>
-                                    </tr>
+
+                                    <template v-else>
+                                        <tr v-for="category in filteredCategories" :key="category.id"
+                                            :class="['transition hover:bg-slate-50/80', selectedCategories.includes(category.id) ? 'bg-indigo-50/30' : '']">
+                                            <td class="w-11 px-4 py-4 text-center">
+                                                <input type="checkbox" :value="category.id" v-model="selectedCategories"
+                                                    class="size-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" />
+                                            </td>
+                                            <td class="px-6 py-4">
+                                                <p class="font-bold text-slate-900">{{ category.name }}</p>
+                                                <p class="mt-0.5 text-[11px] text-slate-400 max-w-xs truncate">{{
+                                                    category.description || 'Chưa có mô tả' }}</p>
+                                            </td>
+                                            <td class="px-4 py-4 whitespace-nowrap">
+                                                <span
+                                                    class="rounded bg-slate-100 px-2 py-0.5 font-mono text-[11px] text-slate-600">/{{
+                                                        category.slug }}</span>
+                                            </td>
+                                            <td class="px-4 py-4 whitespace-nowrap text-slate-500">
+                                                {{ category.parent_id ? categoryName(category.parent_id) : '— (Gốc)' }}
+                                            </td>
+                                            <td class="px-4 py-4 whitespace-nowrap">
+                                                <span class="font-bold text-indigo-600 tabular-nums">{{
+                                                    category.articles_count ?? categoryCount(category.id) }} bài</span>
+                                            </td>
+                                            <td class="px-4 py-4 whitespace-nowrap font-medium text-slate-600 tabular-nums">
+                                                {{ category.sort_order }}
+                                            </td>
+                                            <td class="px-4 py-4 whitespace-nowrap">
+                                                <button @click="handleToggleCategoryStatus(category)" :class="[
+                                                    'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold transition hover:opacity-80',
+                                                    category.is_active
+                                                        ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/60'
+                                                        : 'bg-slate-100 text-slate-600 ring-1 ring-slate-200/60'
+                                                ]">
+                                                    <span class="size-1.5 rounded-full"
+                                                        :class="category.is_active ? 'bg-emerald-500' : 'bg-slate-400'"></span>
+                                                    {{ category.is_active ? 'Đang hiển thị' : 'Đã ẩn' }}
+                                                </button>
+                                            </td>
+                                            <td class="px-6 py-4 text-end whitespace-nowrap">
+                                                <div class="flex items-center justify-end gap-1.5">
+                                                    <button @click="openCategoryForm(category)" title="Sửa danh mục"
+                                                        class="flex size-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-indigo-50 hover:text-indigo-600">
+                                                        <svg class="size-4" viewBox="0 0 24 24" fill="none"
+                                                            stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                                            stroke-linejoin="round">
+                                                            <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                                                        </svg>
+                                                    </button>
+                                                    <button @click="askDelete('category', category)" title="Xóa danh mục"
+                                                        class="flex size-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-rose-50 hover:text-rose-600">
+                                                        <svg class="size-4" viewBox="0 0 24 24" fill="none"
+                                                            stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                                            stroke-linejoin="round">
+                                                            <path
+                                                                d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+
+                                        <tr v-if="!filteredCategories.length">
+                                            <td colspan="8" class="py-14 text-center text-slate-400">
+                                                Chưa có danh mục nào phù hợp với tìm kiếm.
+                                            </td>
+                                        </tr>
+                                    </template>
                                 </tbody>
                             </table>
+                        </div>
+
+                        <!-- Phân trang Footer - Categories -->
+                        <div class="flex items-center justify-between border-t border-slate-100 px-6 py-3.5 text-xs text-slate-500">
+                            <span>
+                                Trang <strong class="text-slate-700">{{ categoriesMeta.current_page }}</strong> /
+                                {{ categoriesMeta.last_page }} —
+                                <strong class="text-indigo-600">{{ categoriesMeta.total }}</strong> danh mục
+                            </span>
+                            <div class="flex items-center gap-1">
+                                <button @click="fetchCategories(1)" :disabled="categoriesMeta.current_page === 1 || isCategoriesLoading"
+                                    class="flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition">«</button>
+                                <button @click="fetchCategories(categoriesMeta.current_page - 1)" :disabled="categoriesMeta.current_page <= 1 || isCategoriesLoading"
+                                    class="flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition">‹</button>
+                                <template v-for="p in categoriesMeta.last_page" :key="p">
+                                    <button v-if="Math.abs(p - categoriesMeta.current_page) <= 2"
+                                        @click="fetchCategories(p)" :disabled="isCategoriesLoading"
+                                        :class="['flex size-8 items-center justify-center rounded-lg border text-xs font-bold transition',
+                                            p === categoriesMeta.current_page
+                                                ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm'
+                                                : 'border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40']">
+                                        {{ p }}
+                                    </button>
+                                </template>
+                                <button @click="fetchCategories(categoriesMeta.current_page + 1)" :disabled="categoriesMeta.current_page >= categoriesMeta.last_page || isCategoriesLoading"
+                                    class="flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition">›</button>
+                                <button @click="fetchCategories(categoriesMeta.last_page)" :disabled="categoriesMeta.current_page === categoriesMeta.last_page || isCategoriesLoading"
+                                    class="flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition">»</button>
+                            </div>
                         </div>
                     </section>
                 </template>
@@ -1466,7 +1766,7 @@ onBeforeUnmount(() => window.clearTimeout(flashTimer))
                             class="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                             <div>
                                 <h3 class="font-display text-base font-bold text-slate-900">Danh sách tài khoản</h3>
-                                <p class="text-xs text-slate-400">{{ users.length }} tài khoản trong hệ thống · {{
+                                <p class="text-xs text-slate-400">{{ usersMeta.total }} tài khoản trong hệ thống · {{
                                     activeUserCount }} đang hoạt động</p>
                             </div>
 
@@ -1523,12 +1823,39 @@ onBeforeUnmount(() => window.clearTimeout(flashTimer))
                             </div>
                         </div>
 
+                        <!-- Thanh tác vụ xóa nhiều người dùng -->
+                        <div v-if="selectedUsers.length > 0"
+                            class="flex items-center justify-between border-b border-indigo-100 bg-indigo-50/70 px-6 py-2.5 text-xs transition-all">
+                            <div class="flex items-center gap-2 text-indigo-950 font-semibold">
+                                <span class="flex size-5 items-center justify-center rounded-full bg-indigo-600 text-white text-[10px] font-bold">{{ selectedUsers.length }}</span>
+                                <span>tài khoản người dùng đã được chọn</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button type="button" @click="selectedUsers = []" class="px-2.5 py-1 text-slate-500 hover:text-slate-700 font-medium transition">
+                                    Bỏ chọn
+                                </button>
+                                <button type="button" @click="askBulkDelete('users')"
+                                    class="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-rose-700 transition active:scale-95">
+                                    <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                        <line x1="10" y1="11" x2="10" y2="17" />
+                                        <line x1="14" y1="11" x2="14" y2="17" />
+                                    </svg>
+                                    Xóa {{ selectedUsers.length }} tài khoản đã chọn
+                                </button>
+                            </div>
+                        </div>
+
                         <!-- Bảng dữ liệu người dùng -->
                         <div v-else class="overflow-x-auto">
                             <table class="w-full text-start text-xs">
                                 <thead>
                                     <tr
                                         class="border-b border-slate-100 bg-slate-50/70 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                                        <th class="w-11 px-4 py-3.5 text-center">
+                                            <input type="checkbox" :checked="isAllUsersSelected" @change="toggleSelectAllUsers"
+                                                class="size-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" />
+                                        </th>
                                         <th class="px-6 py-3.5 text-start">Thành viên</th>
                                         <th class="px-4 py-3.5 text-start">Vai trò</th>
                                         <th class="px-4 py-3.5 text-start">Trạng thái</th>
@@ -1539,7 +1866,12 @@ onBeforeUnmount(() => window.clearTimeout(flashTimer))
                                 </thead>
                                 <tbody class="divide-y divide-slate-100">
                                     <tr v-for="user in filteredUsers" :key="user.id"
-                                        class="transition hover:bg-slate-50/80">
+                                        :class="['transition hover:bg-slate-50/80', selectedUsers.includes(user.id) ? 'bg-indigo-50/30' : '']">
+                                        <td class="w-11 px-4 py-4 text-center">
+                                            <input v-if="user.id !== currentUser?.id" type="checkbox" :value="user.id" v-model="selectedUsers"
+                                                class="size-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" />
+                                            <span v-else class="text-slate-300 text-xs">—</span>
+                                        </td>
                                         <td class="px-6 py-4">
                                             <div class="flex items-center gap-3">
                                                 <div
@@ -1607,12 +1939,46 @@ onBeforeUnmount(() => window.clearTimeout(flashTimer))
                                     </tr>
 
                                     <tr v-if="!filteredUsers.length">
-                                        <td colspan="6" class="py-14 text-center text-slate-400">
+                                        <td colspan="7" class="py-14 text-center text-slate-400">
                                             Không tìm thấy tài khoản người dùng phù hợp.
                                         </td>
                                     </tr>
                                 </tbody>
                             </table>
+                        </div>
+
+                        <!-- Phân trang Footer - Users -->
+                        <div
+                            class="flex items-center justify-between border-t border-slate-100 px-6 py-3.5 text-xs text-slate-500">
+                            <span>
+                                Trang <strong class="text-slate-700">{{ usersMeta.current_page }}</strong> /
+                                {{ usersMeta.last_page }} —
+                                <strong class="text-indigo-600">{{ usersMeta.total }}</strong> người dùng
+                            </span>
+                            <div class="flex items-center gap-1">
+                                <button @click="fetchUsers(1)"
+                                    :disabled="usersMeta.current_page === 1 || isUsersLoading"
+                                    class="flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition">«</button>
+                                <button @click="fetchUsers(usersMeta.current_page - 1)"
+                                    :disabled="usersMeta.current_page <= 1 || isUsersLoading"
+                                    class="flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition">‹</button>
+                                <template v-for="p in usersMeta.last_page" :key="p">
+                                    <button v-if="Math.abs(p - usersMeta.current_page) <= 2" @click="fetchUsers(p)"
+                                        :disabled="isUsersLoading"
+                                        :class="['flex size-8 items-center justify-center rounded-lg border text-xs font-bold transition',
+                                            p === usersMeta.current_page
+                                                ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm'
+                                                : 'border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40']">
+                                        {{ p }}
+                                    </button>
+                                </template>
+                                <button @click="fetchUsers(usersMeta.current_page + 1)"
+                                    :disabled="usersMeta.current_page >= usersMeta.last_page || isUsersLoading"
+                                    class="flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition">›</button>
+                                <button @click="fetchUsers(usersMeta.last_page)"
+                                    :disabled="usersMeta.current_page === usersMeta.last_page || isUsersLoading"
+                                    class="flex size-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition">»</button>
+                            </div>
                         </div>
                     </section>
                 </template>
@@ -1752,7 +2118,7 @@ onBeforeUnmount(() => window.clearTimeout(flashTimer))
                                 <select v-model="categoryForm.parent_id"
                                     class="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-700 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100">
                                     <option value="">Không có (Danh mục gốc)</option>
-                                    <option v-for="cat in categories.filter((c) => c.id !== editingId)" :key="cat.id"
+                                    <option v-for="cat in (allCategories.length ? allCategories : categories).filter((c) => c.id !== editingId)" :key="cat.id"
                                         :value="String(cat.id)">
                                         {{ cat.name }}
                                     </option>
@@ -1869,7 +2235,7 @@ onBeforeUnmount(() => window.clearTimeout(flashTimer))
                                 <select v-model="articleForm.category_id" required
                                     class="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-700 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100">
                                     <option value="">Chọn danh mục</option>
-                                    <option v-for="category in categories" :key="category.id"
+                                    <option v-for="category in (allCategories.length ? allCategories : categories)" :key="category.id"
                                         :value="String(category.id)">{{
                                             category.name }}</option>
                                 </select>
@@ -2026,10 +2392,15 @@ onBeforeUnmount(() => window.clearTimeout(flashTimer))
                             <line x1="14" y1="11" x2="14" y2="17" />
                         </svg>
                     </div>
-                    <h3 class="mt-4 font-display text-base font-bold text-slate-900">Xác nhận xóa dữ liệu</h3>
-                    <p class="mt-1.5 text-xs text-slate-500 leading-relaxed">
-                        Bạn có chắc chắn muốn xóa mục <strong class="text-slate-800">"{{ deleteTarget.record.name ||
-                            deleteTarget.record.title }}"</strong>? Thao tác này sẽ loại bỏ dữ liệu khỏi hệ thống.
+                    <h3 class="mt-4 font-display text-base font-bold text-slate-900">
+                        {{ deleteTarget.count ? `Xác nhận xóa ${deleteTarget.count} mục` : 'Xác nhận xóa dữ liệu' }}
+                    </h3>
+                    <p v-if="deleteTarget.count" class="mt-1.5 text-xs text-slate-500 leading-relaxed">
+                        Bạn có chắc chắn muốn xóa vĩnh viễn <strong class="text-rose-600 font-bold">{{ deleteTarget.count }}</strong> mục đã chọn? Thao tác này sẽ xóa dữ liệu khỏi hệ thống và không thể hoàn tác.
+                    </p>
+                    <p v-else class="mt-1.5 text-xs text-slate-500 leading-relaxed">
+                        Bạn có chắc chắn muốn xóa mục <strong class="text-slate-800">"{{ deleteTarget.record?.name ||
+                            deleteTarget.record?.title }}"</strong>? Thao tác này sẽ loại bỏ dữ liệu khỏi hệ thống.
                     </p>
                     <div class="mt-6 flex items-center justify-center gap-3">
                         <button @click="deleteTarget = null"

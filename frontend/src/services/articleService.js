@@ -60,6 +60,15 @@ export const articleService = {
     const response = await apiClient.delete(`/admin/articles/${id}`)
     return response.data
   },
+
+  /**
+   * Xóa nhiều bài báo cùng lúc
+   * @param {Array<number|string>} ids
+   */
+  async bulkDeleteArticles(ids) {
+    const response = await apiClient.post('/admin/articles/bulk-delete', { ids })
+    return response.data
+  },
 }
 
 export const sourceService = {

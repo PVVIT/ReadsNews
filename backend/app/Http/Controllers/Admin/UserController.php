@@ -49,7 +49,8 @@ class UserController extends Controller
         }
 
         $perPage = min((int) $request->input('per_page', 10), 100);
-        $paginated = $query->orderBy('id', 'desc')->paginate($perPage);
+        $page = max((int) $request->input('page', 1), 1);
+        $paginated = $query->orderBy('id', 'desc')->paginate($perPage, ['*'], 'page', $page);
 
         // Thống kê nhanh toàn bộ hệ thống
         $totalUsers = User::count();
@@ -205,6 +206,48 @@ class UserController extends Controller
         return response()->json([
             'success' => true,
             'message' => "Đã xóa tài khoản {$userName} thành công.",
+        ], 200);
+    }
+
+    /**
+     * POST/DELETE /api/admin/users/bulk-delete
+     * Xóa nhiều người dùng cùng lúc.
+     */
+    public function bulkDestroy(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'ids'   => 'required|array|min:1',
+            'ids.*' => 'integer',
+        ]);
+
+        $currentUser = $request->user();
+        $ids = $validated['ids'];
+
+        // Không cho phép tự xóa tài khoản của chính mình
+        if ($currentUser) {
+            $ids = array_values(array_filter($ids, fn($id) => (int)$id !== (int)$currentUser->id));
+        }
+
+        if (empty($ids)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Bạn không thể tự xóa tài khoản đang đăng nhập của chính mình!',
+            ], 400);
+        }
+
+        $users = User::whereIn('id', $ids)->get();
+        $deletedCount = 0;
+
+        foreach ($users as $user) {
+            $user->tokens()->delete();
+            $user->delete();
+            $deletedCount++;
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "Đã xóa thành công {$deletedCount} người dùng được chọn.",
+            'deleted' => $deletedCount,
         ], 200);
     }
 }

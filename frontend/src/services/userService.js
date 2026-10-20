@@ -46,5 +46,14 @@ export const userService = {
     const response = await apiClient.delete(`/admin/users/${id}`)
     return response.data
   },
+
+  /**
+   * Xóa nhiều người dùng cùng lúc
+   * @param {Array<number|string>} ids
+   */
+  async bulkDeleteUsers(ids) {
+    const response = await apiClient.post('/admin/users/bulk-delete', { ids })
+    return response.data
+  },
 }
 

@@ -37,8 +37,18 @@ class CategoriesController extends Controller
             $query->where('is_active', $isActive);
         }
 
+        // Nếu yêu cầu lấy toàn bộ danh mục (phục vụ dropdown, modal, lookup)
+        if ($request->boolean('all')) {
+            $categories = $query->orderBy('sort_order', 'asc')->orderBy('id', 'asc')->get();
+            return response()->json([
+                'success' => true,
+                'data'    => $categories,
+            ], 200);
+        }
+
         $perPage = min((int) $request->input('per_page', 10), 100);
-        $paginated = $query->orderBy('sort_order', 'asc')->orderBy('id', 'asc')->paginate($perPage);
+        $page = max((int) $request->input('page', 1), 1);
+        $paginated = $query->orderBy('sort_order', 'asc')->orderBy('id', 'asc')->paginate($perPage, ['*'], 'page', $page);
 
         // Thống kê nhanh
         $total = Category::count();
@@ -215,6 +225,31 @@ class CategoriesController extends Controller
         return response()->json([
             'success' => true,
             'message' => "Đã xóa danh mục \"{$categoryName}\" thành công.",
+        ], 200);
+    }
+
+    /**
+     * POST/DELETE /api/admin/categories/bulk-delete
+     * Xóa nhiều danh mục cùng lúc.
+     */
+    public function bulkDestroy(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'ids'   => 'required|array|min:1',
+            'ids.*' => 'integer',
+        ]);
+
+        $ids = $validated['ids'];
+
+        // Cập nhật các danh mục con thành danh mục gốc (parent_id = null)
+        Category::whereIn('parent_id', $ids)->update(['parent_id' => null]);
+
+        $deletedCount = Category::whereIn('id', $ids)->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => "Đã xóa thành công {$deletedCount} danh mục được chọn.",
+            'deleted' => $deletedCount,
         ], 200);
     }
 }

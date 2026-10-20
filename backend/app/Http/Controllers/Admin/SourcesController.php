@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Article;
 use App\Models\Source;
+use App\Services\ScraperService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -104,9 +105,21 @@ class SourcesController extends Controller
                 continue;
             }
 
-            // Lấy mô tả (strip HTML tags)
-            $description = strip_tags((string) ($item->description ?? ''));
-            $description = trim(preg_replace('/\s+/', ' ', $description));
+            // ── Lấy mô tả và thumbnail từ <description> CDATA ────────────
+            // VnExpress RSS: description chứa CDATA với <a><img src="..."></a> + text
+            $rawDescription = (string) ($item->description ?? '');
+            $description    = '';
+            $thumbnailFromDesc = null;
+
+            if (!empty($rawDescription)) {
+                // Thử trích xuất URL ảnh từ thẻ <img> trong CDATA
+                if (preg_match('/<img[^>]+src=["\']([^"\']+)["\']/', $rawDescription, $imgMatch)) {
+                    $thumbnailFromDesc = $imgMatch[1];
+                }
+                // Lấy text thuần (bỏ HTML tags)
+                $description = strip_tags($rawDescription);
+                $description = trim(preg_replace('/\s+/', ' ', $description));
+            }
 
             // Lấy ngày xuất bản
             $publishedAt = null;
@@ -118,19 +131,79 @@ class SourcesController extends Controller
                 }
             }
 
-            // Lấy thumbnail từ media:content hoặc enclosure
+            // Lấy tất cả namespace của feed và item
+            $namespaces = array_merge($feed->getDocNamespaces(true) ?: [], $item->getNamespaces(true) ?: []);
+
+            // ── Lấy tác giả từ Dublin Core namespace (dc:creator) ──────────
+            // VnExpress, Tuổi Trẻ và nhiều báo dùng <dc:creator>
+            $author = null;
+            if (isset($namespaces['dc'])) {
+                $dc        = $item->children($namespaces['dc']);
+                $dcCreator = trim((string) ($dc->creator ?? ''));
+                if (!empty($dcCreator)) {
+                    $author = $dcCreator;
+                }
+            }
+            // Fallback: thử lấy từ <author> chuẩn RSS (Tuổi Trẻ dùng thẻ này)
+            if (empty($author) && !empty((string) $item->author)) {
+                $rawAuthor = trim((string) $item->author);
+                // RSS <author> thường dạng "email (Tên)" — lấy phần tên trong ngoặc
+                if (preg_match('/\((.+?)\)/', $rawAuthor, $m)) {
+                    $author = trim($m[1]);
+                } elseif (!str_contains($rawAuthor, '@')) {
+                    // Nếu không phải email thuần thì dùng luôn
+                    $author = $rawAuthor;
+                }
+            }
+            if (!empty($author)) {
+                // Xoá ký tự ngôi sao, emoji nếu có (Tuổi Trẻ hay có ⭐)
+                $author = trim(preg_replace('/[\x{2B50}\x{2605}\x{2606}]/u', '', $author));
+            }
+
+            // ── Lấy nội dung đầy đủ từ content:encoded nếu có ─────────────
+            // Một số nguồn RSS cung cấp HTML đầy đủ trong <content:encoded>
+            $fullContent = null;
+            if (isset($namespaces['content'])) {
+                $contentNs = $item->children($namespaces['content']);
+                $encoded   = (string) ($contentNs->encoded ?? '');
+                if (!empty(trim(strip_tags($encoded)))) {
+                    $fullContent = trim($encoded); // Giữ nguyên HTML
+                }
+            }
+
+            // ── Lấy thumbnail từ media:content hoặc enclosure ─────────────
             $thumbnail = null;
-            $namespaces = $item->getNamespaces(true);
             if (isset($namespaces['media'])) {
                 $media = $item->children($namespaces['media']);
                 if (isset($media->content)) {
-                    $attrs = $media->content->attributes();
+                    $attrs     = $media->content->attributes();
+                    $thumbnail = (string) ($attrs['url'] ?? '');
+                }
+                // Fallback: media:thumbnail
+                if (empty($thumbnail) && isset($media->thumbnail)) {
+                    $attrs     = $media->thumbnail->attributes();
                     $thumbnail = (string) ($attrs['url'] ?? '');
                 }
             }
             if (empty($thumbnail) && isset($item->enclosure)) {
-                $encAttrs = $item->enclosure->attributes();
+                $encAttrs  = $item->enclosure->attributes();
                 $thumbnail = (string) ($encAttrs['url'] ?? '');
+            }
+            // Fallback: lấy từ ảnh trong description CDATA nếu vẫn trống
+            if (empty($thumbnail) && !empty($thumbnailFromDesc)) {
+                $thumbnail = $thumbnailFromDesc;
+            }
+
+            // ── Nếu RSS không có fullContent hoặc author, scrape từ web gốc ────
+            if (empty($fullContent)) {
+                try {
+                    $scraped = ScraperService::scrapeDetailFromUrl($link, $author);
+                    if ($scraped) {
+                        $fullContent = $scraped;
+                    }
+                } catch (\Exception $e) {
+                    // Bỏ qua lỗi kết nối riêng lẻ để không ngắt luồng crawl
+                }
             }
 
             // Auto slug
@@ -142,15 +215,18 @@ class SourcesController extends Controller
                 $slug = $slug . '-' . time() . '-' . rand(100, 999);
             }
 
-            // Auto word_count
-            $wordCount = $description ? str_word_count($description) : 0;
+            // Tính word_count hỗ trợ tiếng Việt UTF-8
+            $textForWordCount = $fullContent ? strip_tags($fullContent) : $description;
+            $wordCount = $textForWordCount ? count(preg_split('/\s+/u', trim($textForWordCount), -1, PREG_SPLIT_NO_EMPTY)) : 0;
 
             Article::create([
                 'source_id'    => $source->id,
                 'category_id'  => $source->category_id,
                 'title'        => $title,
                 'slug'         => $slug,
+                'author'       => $author ?: null,
                 'summary'      => $description ?: null,
+                'content'      => $fullContent ?: null,
                 'thumbnail'    => $thumbnail ?: null,
                 'original_url' => $link,
                 'url_hash'     => $urlHash,
@@ -171,6 +247,15 @@ class SourcesController extends Controller
             'skipped' => $skipped,
             'source'  => $source->name,
         ]);
+    }
+
+    /**
+     * Crawl bổ sung nội dung chi tiết và tác giả từ URL bài viết gốc.
+     * Hỗ trợ các nguồn báo phổ biến như VnExpress, Tuổi Trẻ.
+     */
+    protected function scrapeDetailFromUrl(string $url, ?string &$existingAuthor = null): ?string
+    {
+        return ScraperService::scrapeDetailFromUrl($url, $existingAuthor);
     }
 }
 

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Article;
+use App\Services\ScraperService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -19,8 +20,9 @@ class ArticlesController extends Controller
         $query = Article::with(['category:id,name,slug', 'source:id,name,slug'])
             ->select([
                 'id', 'source_id', 'category_id', 'title', 'slug',
-                'thumbnail', 'author', 'word_count', 'view_count',
-                'listen_count', 'published_at', 'created_at',
+                'summary', 'ai_summary', 'content', 'content_tts',
+                'thumbnail', 'original_url', 'author', 'word_count',
+                'view_count', 'listen_count', 'published_at', 'created_at',
             ]);
 
         // Tìm kiếm theo tiêu đề / tác giả
@@ -50,10 +52,11 @@ class ArticlesController extends Controller
         }
 
         $perPage = min((int) $request->input('per_page', 10), 100);
+        $page = max((int) $request->input('page', 1), 1);
 
         $paginated = $query->orderByDesc('published_at')
                            ->orderByDesc('id')
-                           ->paginate($perPage);
+                           ->paginate($perPage, ['*'], 'page', $page);
 
         return response()->json([
             'success' => true,
@@ -151,6 +154,35 @@ class ArticlesController extends Controller
     public function show($id)
     {
         $article = Article::with(['category', 'source'])->findOrFail($id);
+
+        // Nếu bài viết chưa có nội dung chi tiết mà có URL bài viết gốc, tự động cào bổ sung
+        if (empty($article->content) && !empty($article->original_url)) {
+            try {
+                $author = $article->author;
+                $scrapedContent = ScraperService::scrapeDetailFromUrl($article->original_url, $author);
+                if ($scrapedContent) {
+                    $text = strip_tags($scrapedContent);
+                    $wordCount = $text ? count(preg_split('/\s+/u', trim($text), -1, PREG_SPLIT_NO_EMPTY)) : $article->word_count;
+                    $article->update([
+                        'content'    => $scrapedContent,
+                        'author'     => $author ?: $article->author,
+                        'word_count' => $wordCount,
+                    ]);
+                }
+            } catch (\Exception $e) {
+                // Không gián đoạn API nếu cào thất bại
+            }
+        } elseif (!empty($article->content) && (str_contains($article->content, 'data-src') || str_contains($article->content, 'data:image/gif'))) {
+            // Chuẩn hoá lại ảnh cho những bài đã cào trước đó nhưng bị vướng lazy-loading
+            try {
+                $normalized = ScraperService::normalizeImages($article->content);
+                if ($normalized !== $article->content) {
+                    $article->update(['content' => $normalized]);
+                }
+            } catch (\Exception $e) {
+                // Bỏ qua nếu có lỗi
+            }
+        }
 
         return response()->json([
             'success' => true,
@@ -283,6 +315,36 @@ class ArticlesController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Đã xóa bài báo thành công.',
+        ]);
+    }
+
+    /**
+     * POST/DELETE /api/admin/articles/bulk-delete
+     * Xóa nhiều bài báo cùng lúc.
+     */
+    public function bulkDestroy(Request $request)
+    {
+        $validated = $request->validate([
+            'ids'   => 'required|array|min:1',
+            'ids.*' => 'integer',
+        ]);
+
+        $articles = Article::whereIn('id', $validated['ids'])->get();
+        $deletedCount = 0;
+
+        foreach ($articles as $article) {
+            if ($article->thumbnail && str_starts_with($article->thumbnail, '/storage/')) {
+                $path = str_replace('/storage/', '', $article->thumbnail);
+                Storage::disk('public')->delete($path);
+            }
+            $article->delete();
+            $deletedCount++;
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "Đã xóa thành công {$deletedCount} bài báo được chọn.",
+            'deleted' => $deletedCount,
         ]);
     }
 }

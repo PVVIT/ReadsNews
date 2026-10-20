@@ -57,6 +57,15 @@ export const categoryService = {
   },
 
   /**
+   * Xóa nhiều danh mục cùng lúc
+   * @param {Array<number|string>} ids
+   */
+  async bulkDeleteCategories(ids) {
+    const response = await apiClient.post('/admin/categories/bulk-delete', { ids })
+    return response.data
+  },
+
+  /**
    * Lấy danh mục public cho trang đọc tin
    */
   async getPublicCategories() {
