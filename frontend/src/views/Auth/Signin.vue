@@ -12,20 +12,36 @@
                   Đăng Nhập
                 </h1>
                 <p class="text-sm text-gray-500 dark:text-gray-400">
-                  Chào mừng trở lại! Vui lòng nhập email và mật khẩu để tiếp tục.
+                  Chào mừng trở lại!
                 </p>
               </div>
 
-              <form @submit.prevent="handleSubmit">
+              <form @submit.prevent="handleSubmit" novalidate>
                 <div class="space-y-4">
                   <!-- Email -->
                   <div>
                     <label for="email" class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-400">
                       Email <span class="text-error-500">*</span>
                     </label>
-                    <input v-model="email" type="email" id="email" name="email" required
-                      placeholder="Nhập tài khoản hoặc email của bạn"
-                      class="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-xs text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800" />
+                    <div class="relative">
+                      <input v-model="email" @input="clearFieldError('email')" @blur="validateField('email')" type="email" id="email" name="email" 
+                        placeholder="Nhập tài khoản hoặc email của bạn"
+                        :class="[
+                          'dark:bg-dark-900 h-11 w-full rounded-lg border bg-transparent px-4 py-2.5 text-xs shadow-theme-xs placeholder:text-gray-400 focus:outline-hidden focus:ring-3 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 transition-colors',
+                          errors.email
+                            ? 'border-red-500 text-red-900 focus:border-red-500 focus:ring-red-500/10 pe-10 dark:border-red-500 dark:text-red-300'
+                            : 'border-gray-300 text-gray-800 focus:border-brand-300 focus:ring-brand-500/10 dark:border-gray-700 dark:focus:border-brand-800'
+                        ]" />
+                      <div v-if="errors.email" class="pointer-events-none absolute inset-y-0 end-0 flex items-center pe-3 text-red-500">
+                        <svg class="size-4.5" viewBox="0 0 16 16" fill="currentColor">
+                          <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                          <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0M7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0z"/>
+                        </svg>
+                      </div>
+                    </div>
+                    <p v-if="errors.email" class="mt-1.5 text-xs text-red-500 font-medium">
+                      {{ errors.email }}
+                    </p>
                   </div>
 
                   <!-- Mật khẩu -->
@@ -34,14 +50,30 @@
                       Mật khẩu <span class="text-error-500">*</span>
                     </label>
                     <div class="relative">
-                      <input v-model="password" :type="showPassword ? 'text' : 'password'" id="password" required
+                      <input v-model="password" @input="clearFieldError('password')" @blur="validateField('password')" :type="showPassword ? 'text' : 'password'" id="password" 
                         placeholder="Nhập mật khẩu"
-                        class="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent py-2.5 px-4 pe-11 text-xs text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800" />
-                      <button type="button" @click="togglePasswordVisibility"
-                        class="absolute inset-y-0 end-0 flex items-center pe-3 text-xs text-gray-400 hover:text-gray-600 dark:text-gray-400">
-                        {{ showPassword ? 'Ẩn' : 'Hiện' }}
-                      </button>
+                        :class="[
+                          'dark:bg-dark-900 h-11 w-full rounded-lg border bg-transparent py-2.5 px-4 text-xs shadow-theme-xs placeholder:text-gray-400 focus:outline-hidden focus:ring-3 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 transition-colors',
+                          errors.password
+                            ? 'border-red-500 text-red-900 focus:border-red-500 focus:ring-red-500/10 pe-16 dark:border-red-500 dark:text-red-300'
+                            : 'border-gray-300 text-gray-800 focus:border-brand-300 focus:ring-brand-500/10 pe-11 dark:border-gray-700 dark:focus:border-brand-800'
+                        ]" />
+                      <div class="absolute inset-y-0 end-0 flex items-center pe-3 gap-1.5">
+                        <span v-if="errors.password" class="text-red-500 pointer-events-none">
+                          <svg class="size-4.5" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14m0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16"/>
+                            <path d="M7.002 11a1 1 0 1 1 2 0 1 1 0 0 1-2 0M7.1 4.995a.905.905 0 1 1 1.8 0l-.35 3.507a.552.552 0 0 1-1.1 0z"/>
+                          </svg>
+                        </span>
+                        <button type="button" @click="togglePasswordVisibility"
+                          class="text-xs text-gray-400 hover:text-gray-600 dark:text-gray-400">
+                          {{ showPassword ? 'Ẩn' : 'Hiện' }}
+                        </button>
+                      </div>
                     </div>
+                    <p v-if="errors.password" class="mt-1.5 text-xs text-red-500 font-medium">
+                      {{ errors.password }}
+                    </p>
                   </div>
 
                   <!-- Tùy chọn nhớ mật khẩu & Quên mật khẩu -->
@@ -62,7 +94,7 @@
                   <!-- Nút Đăng nhập -->
                   <div class="pt-2">
                     <button type="submit" :disabled="isLoading || isRedirecting"
-                      class="flex items-center justify-center w-full px-4 py-3 text-sm font-bold text-white transition rounded-xl bg-brand-500 shadow-theme-xs hover:bg-brand-600 disabled:opacity-60 disabled:cursor-not-allowed">
+                      class="flex items-center justify-center w-full px-4 py-3 text-sm font-bold text-white transition rounded-xl bg-brand-500 shadow-theme-xs hover:bg-brand-600 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer">
                       <svg v-if="isLoading" class="animate-spin -ms-1 me-2 size-4 text-white" viewBox="0 0 24 24"
                         fill="none">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
@@ -111,7 +143,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onBeforeUnmount } from 'vue'
+import { ref, reactive, onBeforeUnmount } from 'vue'
 import CommonGridShape from '@/components/common/CommonGridShape.vue'
 import FullScreenLayout from '@/components/layout/FullScreenLayout.vue'
 import { authService } from '@/services/authService'
@@ -127,20 +159,69 @@ const isRedirecting = ref(false)
 const redirectProgress = ref(0)
 const remainingSeconds = ref(3)
 
+const errors = reactive({
+  email: '',
+  password: '',
+})
+
 let progressTimer: any = null
 
 const togglePasswordVisibility = () => {
   showPassword.value = !showPassword.value
 }
 
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+const validateField = (field: 'email' | 'password') => {
+  if (field === 'email') {
+    const val = email.value.trim()
+    if (!val) {
+      errors.email = 'Vui lòng nhập địa chỉ email.'
+    } else if (!emailRegex.test(val)) {
+      errors.email = 'Địa chỉ email không đúng định dạng.'
+    } else {
+      errors.email = ''
+    }
+  } else if (field === 'password') {
+    const val = password.value
+    if (!val) {
+      errors.password = 'Vui lòng nhập mật khẩu.'
+    } else if (val.length < 6) {
+      errors.password = 'Mật khẩu phải có ít nhất 6 ký tự.'
+    } else {
+      errors.password = ''
+    }
+  }
+}
+
+const clearFieldError = (field: 'email' | 'password') => {
+  if (errors[field]) {
+    validateField(field)
+  }
+}
+
+const validateAll = () => {
+  validateField('email')
+  validateField('password')
+  return !errors.email && !errors.password
+}
+
 const handleSubmit = async () => {
-  if (!email.value || !password.value) return
+  if (!validateAll()) {
+    // Focus vào trường bị lỗi đầu tiên
+    if (errors.email) {
+      document.getElementById('email')?.focus()
+    } else if (errors.password) {
+      document.getElementById('password')?.focus()
+    }
+    return
+  }
 
   isLoading.value = true
 
   try {
     const res = await authService.login({
-      email: email.value,
+      email: email.value.trim(),
       password: password.value,
     })
 
@@ -177,8 +258,14 @@ const handleSubmit = async () => {
       }, 50)
     }
   } catch (err: any) {
-    // Axios interceptor tự động hiển thị toast lỗi (401, 403, 422...)
     isLoading.value = false
+    const serverErrors = err.response?.data?.errors
+    if (serverErrors) {
+      if (serverErrors.email) errors.email = serverErrors.email[0]
+      if (serverErrors.password) errors.password = serverErrors.password[0]
+    } else if (err.response?.status === 401) {
+      errors.password = err.response?.data?.message || 'Tài khoản hoặc mật khẩu không chính xác.'
+    }
   }
 }
 
