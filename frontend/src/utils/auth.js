@@ -1,7 +1,27 @@
 import { ref } from 'vue'
 
-const currentUser = ref(JSON.parse(localStorage.getItem('auth_user') || 'null'))
-const authToken = ref(localStorage.getItem('auth_token') || null)
+function getInitialUser() {
+  const local = localStorage.getItem('auth_user')
+  if (local) {
+    try {
+      return JSON.parse(local)
+    } catch (_) {}
+  }
+  const session = sessionStorage.getItem('auth_user')
+  if (session) {
+    try {
+      return JSON.parse(session)
+    } catch (_) {}
+  }
+  return null
+}
+
+function getInitialToken() {
+  return localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token') || null
+}
+
+const currentUser = ref(getInitialUser())
+const authToken = ref(getInitialToken())
 
 export const auth = {
   // Trạng thái reactive
@@ -10,31 +30,54 @@ export const auth = {
 
   /**
    * Lưu thông tin đăng nhập
+   * @param {Object} user Thông tin tài khoản người dùng
+   * @param {String|null} token Mã JWT / Bearer Token
+   * @param {Boolean} remember Cờ ghi nhớ đăng nhập (true: lưu vào localStorage lâu dài, false: lưu tạm vào sessionStorage)
    */
-  setAuth(user, token = null) {
+  setAuth(user, token = null, remember = true) {
     currentUser.value = user
-    localStorage.setItem('auth_user', JSON.stringify(user))
-
     if (token) {
       authToken.value = token
-      localStorage.setItem('auth_token', token)
+    }
+
+    if (remember) {
+      localStorage.setItem('auth_user', JSON.stringify(user))
+      if (token) {
+        localStorage.setItem('auth_token', token)
+      }
+      // Dọn dẹp session cũ nếu có
+      sessionStorage.removeItem('auth_user')
+      sessionStorage.removeItem('auth_token')
+    } else {
+      sessionStorage.setItem('auth_user', JSON.stringify(user))
+      if (token) {
+        sessionStorage.setItem('auth_token', token)
+      }
+      // Xóa trong localStorage để đảm bảo tài khoản chỉ lưu tạm trong phiên duyệt web
+      localStorage.removeItem('auth_user')
+      localStorage.removeItem('auth_token')
     }
   },
 
   /**
-   * Xóa thông tin đăng nhập (đăng xuất)
+   * Xóa thông tin đăng nhập (đăng xuất khỏi cả localStorage và sessionStorage)
    */
   clearAuth() {
     currentUser.value = null
     authToken.value = null
     localStorage.removeItem('auth_user')
     localStorage.removeItem('auth_token')
+    sessionStorage.removeItem('auth_user')
+    sessionStorage.removeItem('auth_token')
   },
 
   /**
    * Lấy user hiện tại
    */
   getUser() {
+    if (!currentUser.value) {
+      currentUser.value = getInitialUser()
+    }
     return currentUser.value
   },
 
@@ -42,6 +85,9 @@ export const auth = {
    * Lấy token
    */
   getToken() {
+    if (!authToken.value) {
+      authToken.value = getInitialToken()
+    }
     return authToken.value
   },
 
@@ -49,35 +95,35 @@ export const auth = {
    * Kiểm tra đã đăng nhập chưa
    */
   isAuthenticated() {
-    return !!currentUser.value
+    return !!this.getUser()
   },
 
   /**
    * Lấy role hiện tại của user
    */
   getRole() {
-    return currentUser.value?.role || null
+    return this.getUser()?.role || null
   },
 
   /**
    * Kiểm tra xem user có phải Admin không
    */
   isAdmin() {
-    return currentUser.value?.role === 'admin'
+    return this.getUser()?.role === 'admin'
   },
 
   /**
    * Kiểm tra xem user có phải Editor không
    */
   isEditor() {
-    return currentUser.value?.role === 'editor'
+    return this.getUser()?.role === 'editor'
   },
 
   /**
    * Kiểm tra xem user có phải User thông thường không
    */
   isUser() {
-    return currentUser.value?.role === 'user'
+    return this.getUser()?.role === 'user'
   },
 
   /**
@@ -85,9 +131,10 @@ export const auth = {
    * Ví dụ: auth.hasRole('admin') hoặc auth.hasRole(['admin', 'editor'])
    */
   hasRole(roles) {
-    if (!currentUser.value) return false
+    const user = this.getUser()
+    if (!user) return false
 
-    const userRole = currentUser.value.role
+    const userRole = user.role
     if (Array.isArray(roles)) {
       return roles.includes(userRole)
     }
@@ -115,4 +162,3 @@ export const vRole = {
     }
   },
 }
-

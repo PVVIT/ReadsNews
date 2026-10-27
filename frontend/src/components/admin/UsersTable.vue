@@ -136,47 +136,51 @@ function handleUserCheckbox(id, isChecked) {
             </div>
         </div>
 
-        <!-- Trạng thái loading ban đầu -->
-        <div v-if="isLoading && !users.length" class="p-12 text-center text-slate-400">
-            <div class="inline-flex items-center gap-2 text-xs font-semibold text-indigo-600">
-                <svg class="size-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2.5">
-                    <circle cx="12" cy="12" r="10" stroke-opacity="0.25" />
-                    <path d="M12 2a10 10 0 0 1 10 10" />
-                </svg>
-                <span>Đang tải danh sách người dùng từ hệ thống...</span>
-            </div>
-        </div>
+        <!-- Thanh tác vụ xóa nhiều người dùng -->
+        <BulkActionBar
+            :count="selectedUsers.length"
+            label="tài khoản người dùng"
+            actionLabel="tài khoản"
+            @clear="$emit('update:selectedUsers', [])"
+            @delete="$emit('bulk-delete')"
+        />
 
-        <template v-else>
-            <!-- Thanh tác vụ xóa nhiều người dùng -->
-            <BulkActionBar
-                :count="selectedUsers.length"
-                label="tài khoản người dùng"
-                actionLabel="tài khoản"
-                @clear="$emit('update:selectedUsers', [])"
-                @delete="$emit('bulk-delete')"
-            />
-
-            <!-- Bảng dữ liệu người dùng -->
-            <div class="overflow-x-auto">
-                <table class="w-full text-start text-xs">
-                    <thead>
-                        <tr
-                            class="border-b border-slate-100 bg-slate-50/70 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                            <th class="w-11 px-4 py-3.5 text-center">
-                                <input type="checkbox" :checked="isAllUsersSelected" @change="toggleSelectAll"
-                                    class="size-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" />
-                            </th>
-                            <th class="px-6 py-3.5 text-start">Thành viên</th>
-                            <th class="px-4 py-3.5 text-start">Vai trò</th>
-                            <th class="px-4 py-3.5 text-start">Trạng thái</th>
-                            <th class="px-4 py-3.5 text-start">Ngày tham gia</th>
-                            <th class="px-4 py-3.5 text-center">Thao tác</th>
-                            <th class="px-6 py-3.5 text-end">Mã định danh</th>
+        <!-- Bảng dữ liệu người dùng -->
+        <div class="overflow-x-auto">
+            <table class="w-full text-start text-xs">
+                <thead>
+                    <tr
+                        class="border-b border-slate-100 bg-slate-50/70 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                        <th class="w-11 px-4 py-3.5 text-center">
+                            <input type="checkbox" :checked="isAllUsersSelected" @change="toggleSelectAll"
+                                class="size-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer" />
+                        </th>
+                        <th class="px-6 py-3.5 text-start">Thành viên</th>
+                        <th class="px-4 py-3.5 text-start">Vai trò</th>
+                        <th class="px-4 py-3.5 text-start">Trạng thái</th>
+                        <th class="px-4 py-3.5 text-start">Ngày tham gia</th>
+                        <th class="px-4 py-3.5 text-center">Thao tác</th>
+                        <th class="px-6 py-3.5 text-end">Mã định danh</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    <tr v-if="isLoading">
+                        <td colspan="7" class="py-14 text-center text-slate-400">
+                            <div class="inline-flex items-center gap-2">
+                                <svg class="size-5 animate-spin text-indigo-600" viewBox="0 0 24 24" fill="none">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                                </svg>
+                                <span>Đang tải danh sách người dùng...</span>
+                            </div>
+                        </td>
+                    </tr>
+                    <template v-else>
+                        <tr v-if="!users.length">
+                            <td colspan="7" class="py-14 text-center text-slate-400">
+                                Không tìm thấy tài khoản người dùng phù hợp.
+                            </td>
                         </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
                         <tr v-for="user in users" :key="user.id"
                             :class="['transition hover:bg-slate-50/80', selectedUsers.includes(user.id) ? 'bg-indigo-50/30' : '']">
                             <td class="w-11 px-4 py-4 text-center">
@@ -250,26 +254,20 @@ function handleUserCheckbox(id, isChecked) {
                                 #US-{{ String(user.id).padStart(3, '0') }}
                             </td>
                         </tr>
+                    </template>
+                </tbody>
+            </table>
+        </div>
 
-                        <tr v-if="!users.length">
-                            <td colspan="7" class="py-14 text-center text-slate-400">
-                                Không tìm thấy tài khoản người dùng phù hợp.
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Phân trang Footer - Users -->
-            <PaginationFooter
-                :current-page="meta.current_page"
-                :last-page="meta.last_page"
-                :total="meta.total"
-                label="người dùng"
-                :is-loading="isLoading"
-                @change-page="$emit('change-page', $event)"
-            />
-        </template>
+        <!-- Phân trang Footer - Users -->
+        <PaginationFooter
+            :current-page="meta.current_page"
+            :last-page="meta.last_page"
+            :total="meta.total"
+            label="người dùng"
+            :is-loading="isLoading"
+            @change-page="$emit('change-page', $event)"
+        />
     </section>
 </template>
 

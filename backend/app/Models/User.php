@@ -30,6 +30,9 @@ class User extends Authenticatable
         'email',
         'password',
         'avatar',
+        'birth_date',
+        'gender',
+        'phone',
         'role',
         'is_active',
     ];
@@ -55,6 +58,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'birth_date' => 'date:Y-m-d',
         ];
     }
 

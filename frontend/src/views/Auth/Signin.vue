@@ -143,7 +143,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onBeforeUnmount } from 'vue'
+import { ref, reactive, onMounted, onBeforeUnmount } from 'vue'
 import CommonGridShape from '@/components/common/CommonGridShape.vue'
 import FullScreenLayout from '@/components/layout/FullScreenLayout.vue'
 import { authService } from '@/services/authService'
@@ -226,14 +226,23 @@ const handleSubmit = async () => {
     })
 
     if (res.data?.token && res.data?.user) {
-      auth.setAuth(res.data.user, res.data.token)
+      // Lưu thông tin đăng nhập: nếu keepLoggedIn thì lưu vào localStorage, ngược lại lưu tạm vào sessionStorage
+      auth.setAuth(res.data.user, res.data.token, keepLoggedIn.value)
+
+      // Ghi nhớ hoặc xóa tài khoản email trên trình duyệt theo lựa chọn
+      if (keepLoggedIn.value) {
+        localStorage.setItem('remember_email', email.value.trim())
+        localStorage.setItem('remember_me', 'true')
+      } else {
+        localStorage.removeItem('remember_email')
+        localStorage.removeItem('remember_me')
+      }
 
       // Kích hoạt thông báo Toast thành công
       toast.success('Đăng nhập thành công! Hệ thống đang chuyển hướng sau 1 giây...', {
         autoClose: 1500,
       })
 
-      // Kích hoạt hiệu ứng loading 1.5 giây trước khi chuyển hướng
       isRedirecting.value = true
       redirectProgress.value = 0
       remainingSeconds.value = 1.5
@@ -268,6 +277,16 @@ const handleSubmit = async () => {
     }
   }
 }
+
+onMounted(() => {
+  // Tự động điền tài khoản đã ghi nhớ trên trình duyệt nếu có
+  const savedEmail = localStorage.getItem('remember_email')
+  const savedRemember = localStorage.getItem('remember_me')
+  if (savedEmail) {
+    email.value = savedEmail
+    keepLoggedIn.value = savedRemember !== 'false'
+  }
+})
 
 onBeforeUnmount(() => {
   if (progressTimer) clearInterval(progressTimer)

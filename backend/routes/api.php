@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\ArticlesController;
 use App\Http\Controllers\Admin\CategoriesController;
 use App\Http\Controllers\Admin\SourcesController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Admin\VoiceController;
 use App\Http\Controllers\Auth\AuthController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -22,6 +23,14 @@ Route::prefix('auth')->group(function () {
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/logout', [AuthController::class, 'logout']);
     });
+});
+
+// Profile Routes (Dành cho tài khoản cá nhân đã đăng nhập)
+Route::middleware('auth:sanctum')->prefix('profile')->group(function () {
+    Route::get('/', [\App\Http\Controllers\ProfileController::class, 'show']);
+    Route::put('/', [\App\Http\Controllers\ProfileController::class, 'update']);
+    Route::post('/avatar', [\App\Http\Controllers\ProfileController::class, 'updateAvatar']);
+    Route::put('/password', [\App\Http\Controllers\ProfileController::class, 'changePassword']);
 });
 
 // Quản trị hệ thống (Admin & Editor)
@@ -65,7 +74,24 @@ Route::middleware(['auth:sanctum', 'role:admin,editor'])->prefix('admin')->group
     // Quản lý nguồn tin (Sources)
     Route::prefix('sources')->group(function () {
         Route::get('/', [SourcesController::class, 'index']);
+        Route::post('/', [SourcesController::class, 'store']);
+        Route::match(['post', 'delete'], '/bulk-delete', [SourcesController::class, 'bulkDestroy']);
+        Route::get('/{id}', [SourcesController::class, 'show']);
+        Route::put('/{id}', [SourcesController::class, 'update']);
+        Route::patch('/{id}/toggle-status', [SourcesController::class, 'toggleStatus']);
+        Route::delete('/{id}', [SourcesController::class, 'destroy']);
         Route::post('/{id}/crawl', [SourcesController::class, 'crawlRss']);
+    });
+
+    // Quản lý giọng nói AI (Voices)
+    Route::prefix('voices')->group(function () {
+        Route::get('/', [VoiceController::class, 'index']);
+        Route::post('/', [VoiceController::class, 'store']);
+        Route::match(['post', 'delete'], '/bulk-delete', [VoiceController::class, 'bulkDestroy']);
+        Route::get('/{id}', [VoiceController::class, 'show']);
+        Route::put('/{id}', [VoiceController::class, 'update']);
+        Route::patch('/{id}/toggle-status', [VoiceController::class, 'toggleStatus']);
+        Route::delete('/{id}', [VoiceController::class, 'destroy']);
     });
 });
 

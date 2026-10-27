@@ -35,6 +35,10 @@ const props = defineProps({
     totalListens: {
         type: Number,
         default: 0
+    },
+    isLoading: {
+        type: Boolean,
+        default: false
     }
 })
 
@@ -65,7 +69,83 @@ function categoryCount(id) {
 </script>
 
 <template>
-    <div>
+    <!-- Trạng thái Loading Skeleton khi reload hoặc nạp dữ liệu -->
+    <div v-if="isLoading" class="space-y-6">
+        <!-- Skeleton 4 Thẻ Thống Kê Chính -->
+        <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Đang tải thống kê">
+            <div v-for="n in 4" :key="n"
+                class="animate-pulse rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm space-y-4">
+                <div class="flex items-center justify-between">
+                    <div class="h-3.5 w-32 bg-slate-200 rounded"></div>
+                    <div class="size-10 rounded-xl bg-slate-100"></div>
+                </div>
+                <div class="flex items-baseline justify-between pt-1">
+                    <div class="h-7 w-20 bg-slate-200 rounded"></div>
+                    <div class="h-4 w-24 bg-slate-100 rounded-full"></div>
+                </div>
+                <div class="h-3 w-40 bg-slate-100 rounded"></div>
+            </div>
+        </section>
+
+        <!-- Skeleton Biểu đồ & Phân bổ danh mục -->
+        <section class="grid grid-cols-1 gap-6 xl:grid-cols-3">
+            <div class="animate-pulse rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm xl:col-span-2 space-y-4">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+                    <div class="space-y-1.5">
+                        <div class="h-4 w-44 bg-slate-200 rounded"></div>
+                        <div class="h-3 w-64 bg-slate-100 rounded"></div>
+                    </div>
+                    <div class="h-8 w-32 bg-slate-100 rounded-lg"></div>
+                </div>
+                <div class="h-56 rounded-xl bg-slate-50/80 flex flex-col items-center justify-center gap-2 text-slate-400">
+                    <svg class="size-6 animate-spin text-indigo-600" viewBox="0 0 24 24" fill="none">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                    </svg>
+                    <span class="text-xs font-semibold text-slate-500">Đang tổng hợp số liệu hệ thống...</span>
+                </div>
+            </div>
+
+            <div class="animate-pulse rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm space-y-4">
+                <div class="border-b border-slate-100 pb-4">
+                    <div class="h-4 w-36 bg-slate-200 rounded"></div>
+                    <div class="mt-1 h-3 w-48 bg-slate-100 rounded"></div>
+                </div>
+                <div class="space-y-4 pt-2">
+                    <div v-for="i in 4" :key="i" class="space-y-2">
+                        <div class="flex justify-between">
+                            <div class="h-3.5 w-24 bg-slate-200 rounded"></div>
+                            <div class="h-3.5 w-12 bg-slate-100 rounded"></div>
+                        </div>
+                        <div class="h-2 w-full bg-slate-100 rounded-full"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Skeleton Bảng Bài Báo Mới Nhất -->
+        <section class="animate-pulse rounded-2xl border border-slate-200/80 bg-white shadow-sm overflow-hidden p-6 space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+                <div class="h-4 w-48 bg-slate-200 rounded"></div>
+                <div class="h-3.5 w-28 bg-slate-100 rounded"></div>
+            </div>
+            <div class="space-y-3 pt-2">
+                <div v-for="row in 3" :key="row" class="flex items-center justify-between py-2 border-b border-slate-50">
+                    <div class="flex items-center gap-3">
+                        <div class="size-11 rounded-lg bg-slate-100 shrink-0"></div>
+                        <div class="space-y-1.5">
+                            <div class="h-3.5 w-56 sm:w-80 bg-slate-200 rounded"></div>
+                            <div class="h-3 w-40 bg-slate-100 rounded"></div>
+                        </div>
+                    </div>
+                    <div class="h-4 w-20 bg-slate-100 rounded-full"></div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Dữ liệu thực tế khi nạp xong -->
+    <div v-else>
         <!-- 4 Thẻ Thống Kê Chính -->
         <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
             aria-label="Thống kê tổng quan">

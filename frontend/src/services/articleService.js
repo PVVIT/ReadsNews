@@ -1,4 +1,7 @@
 import apiClient from './axios'
+import { sourceService } from './sourceService'
+
+export { sourceService }
 
 export const articleService = {
   /**
@@ -67,25 +70,6 @@ export const articleService = {
    */
   async bulkDeleteArticles(ids) {
     const response = await apiClient.post('/admin/articles/bulk-delete', { ids })
-    return response.data
-  },
-}
-
-export const sourceService = {
-  /**
-   * Lấy danh sách nguồn báo
-   */
-  async getSources() {
-    const response = await apiClient.get('/admin/sources')
-    return response.data
-  },
-
-  /**
-   * Kích hoạt crawl RSS cho một nguồn báo
-   * @param {number|string} id
-   */
-  async crawlRss(id) {
-    const response = await apiClient.post(`/admin/sources/${id}/crawl`)
     return response.data
   },
 }

@@ -157,7 +157,7 @@ function handleArticleCheckbox(id, isChecked) {
             <!-- Nhóm bên phải: Crawl RSS + Thêm bài -->
             <div class="flex flex-wrap items-center gap-2 shrink-0">
                 <!-- Nút Crawl RSS -->
-                <div v-if="sources.length" class="flex items-center gap-1.5">
+                <!-- <div v-if="sources.length" class="flex items-center gap-1.5">
                     <span class="text-xs font-semibold text-slate-500 shrink-0">Crawl RSS:</span>
                     <button v-for="src in sources" :key="src.id" type="button"
                         @click="$emit('crawl-rss', src.id)"
@@ -178,18 +178,8 @@ function handleArticleCheckbox(id, isChecked) {
                         </svg>
                         {{ src.name }}
                     </button>
-                </div>
+                </div> -->
 
-                <!-- Nút thêm bài -->
-                <button @click="$emit('create-article')" type="button"
-                    class="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-indigo-700 transition active:scale-95">
-                    <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="2.5">
-                        <line x1="12" y1="5" x2="12" y2="19" />
-                        <line x1="5" y1="12" x2="19" y2="12" />
-                    </svg>
-                    Thêm bài báo
-                </button>
 
                 <div class="text-xs font-semibold text-slate-500 pl-2 border-l border-slate-200">
                     <span class="font-bold text-indigo-600">{{ articles.length }}</span> bài
@@ -242,7 +232,8 @@ function handleArticleCheckbox(id, isChecked) {
                         </td>
                     </tr>
 
-                    <tr v-if="!isLoading" v-for="article in articles" :key="article.id"
+                    <template v-else>
+                    <tr v-for="article in articles" :key="article.id"
                         :class="['transition hover:bg-slate-50/80', selectedArticles.includes(article.id) ? 'bg-indigo-50/30' : '']">
                         <!-- Ô chọn hàng loạt -->
                         <td class="w-11 px-4 py-4 text-center">
@@ -350,7 +341,7 @@ function handleArticleCheckbox(id, isChecked) {
                     </tr>
 
                     <!-- Empty state -->
-                    <tr v-if="!isLoading && !articles.length">
+                    <tr v-if="!articles.length">
                         <td colspan="8" class="py-16 text-center text-slate-400">
                             <div class="flex flex-col items-center justify-center">
                                 <svg class="size-10 text-slate-300 mb-2" viewBox="0 0 24 24" fill="none"
@@ -365,6 +356,7 @@ function handleArticleCheckbox(id, isChecked) {
                             </div>
                         </td>
                     </tr>
+                    </template>
                 </tbody>
             </table>
         </div>

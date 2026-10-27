@@ -7,6 +7,7 @@ import Signin from './views/Auth/Signin.vue'
 import Signup from './views/Auth/Signup.vue'
 import ForgotPassword from './views/Auth/ForgotPassword.vue'
 import ResetPassword from './views/Auth/ResetPassword.vue'
+import Profile from './views/Profile.vue'
 
 // ─── Routing ────────────────────────────────────────────────────────────────
 const currentPath = ref(window.location.pathname.replace(/\/+$/, '') || '/')
@@ -26,15 +27,19 @@ onBeforeUnmount(() => {
 })
 
 /**
- * Chỉ admin và editor mới được truy cập /admin.
+ * Chỉ admin và editor mới được truy cập /admin và /admin/*.
  * Nếu không có quyền → redirect về trang chủ và set cờ unauthorizedAccess.
  */
 const unauthorizedAccess = ref(false)
 
+function isAdminPath(path) {
+  return path === '/admin' || path.startsWith('/admin/')
+}
+
 function guardAdminRoute() {
   const path = window.location.pathname.replace(/\/+$/, '') || '/'
 
-  if (path === '/admin') {
+  if (isAdminPath(path)) {
     // Chưa đăng nhập → redirect về /signin
     if (!auth.isAuthenticated()) {
       window.history.replaceState(null, '', '/signin')
@@ -49,6 +54,15 @@ function guardAdminRoute() {
       unauthorizedAccess.value = true
       // Xóa cờ sau 4 giây
       setTimeout(() => { unauthorizedAccess.value = false }, 4000)
+    }
+    return
+  }
+
+  // Bảo vệ route /profile: yêu cầu đã đăng nhập
+  if (path === '/profile') {
+    if (!auth.isAuthenticated()) {
+      window.history.replaceState(null, '', '/signin')
+      currentPath.value = '/signin'
     }
   }
 }
@@ -67,7 +81,8 @@ onMounted(() => {
 
 // Computed: route hiện tại có được phép hiển thị AdminDashboard không?
 const canAccessAdmin = computed(() => {
-  return currentPath.value === '/admin' && auth.hasRole(['admin', 'editor'])
+  const path = currentPath.value
+  return (path === '/admin' || path.startsWith('/admin/')) && auth.hasRole(['admin', 'editor'])
 })
 </script>
 
@@ -98,6 +113,7 @@ const canAccessAdmin = computed(() => {
   <Signup v-else-if="currentPath === '/signup' || currentPath === '/register'" />
   <ForgotPassword v-else-if="currentPath === '/forgot-password' || currentPath === '/reset-password-request'" />
   <ResetPassword v-else-if="currentPath === '/reset-password'" />
+  <Profile v-else-if="currentPath === '/profile'" />
   <ReaderHome v-else />
 </template>
 

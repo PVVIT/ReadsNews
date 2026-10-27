@@ -105,6 +105,24 @@ const featuredArticle = articles[0]
 
 // User Auth info
 const currentUser = computed(() => auth.getUser())
+const showUserDropdown = ref(false)
+const userDropdownRef = ref(null)
+
+function toggleUserDropdown() {
+  showUserDropdown.value = !showUserDropdown.value
+}
+
+function closeUserDropdown(e) {
+  if (userDropdownRef.value && !userDropdownRef.value.contains(e.target)) {
+    showUserDropdown.value = false
+  }
+}
+
+function navigateTo(path) {
+  showUserDropdown.value = false
+  window.history.pushState(null, '', path)
+  window.dispatchEvent(new PopStateEvent('popstate'))
+}
 const readerName = computed(() => {
   if (currentUser.value?.name) {
     return currentUser.value.name.split(' ').at(-1)
@@ -259,28 +277,36 @@ function changeSpeed(rate) {
 }
 
 const showLogoutModal = ref(false)
+const isLoggingOut = ref(false)
 
 function handleLogout() {
   showLogoutModal.value = true
 }
 
 async function confirmLogout() {
+  if (isLoggingOut.value) return
+  isLoggingOut.value = true
   try {
     await authService.logout()
   } catch (e) {
     // Không gián đoạn nếu network có lỗi
   }
   auth.clearAuth()
-  showLogoutModal.value = false
   toast.success('Đã đăng xuất tài khoản thành công!', {
     autoClose: 2000,
   })
   setTimeout(() => {
-    window.location.reload()
-  }, 1000)
+    showLogoutModal.value = false
+    window.location.href = '/'
+  }, 800)
 }
 
+onMounted(() => {
+  window.addEventListener('click', closeUserDropdown)
+})
+
 onBeforeUnmount(() => {
+  window.removeEventListener('click', closeUserDropdown)
   stopSpeech()
   clearTimeout(noticeTimer)
 })
@@ -323,20 +349,8 @@ onBeforeUnmount(() => {
         <!-- User Actions / Status -->
         <div class="flex items-center gap-2.5 sm:gap-3">
           <template v-if="currentUser">
-            <div
-              class="hidden md:flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 border border-slate-200/80">
-              <span class="size-2 rounded-full bg-emerald-500"></span>
-              <span class="text-xs font-medium text-slate-600">
-                Chào, <strong class="text-slate-900 font-semibold">{{ readerName }}</strong>
-              </span>
-              <span v-if="currentUser.role === 'admin'"
-                class="rounded bg-indigo-100 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700 uppercase">
-                Admin
-              </span>
-            </div>
-
             <a v-if="currentUser.role === 'admin' || currentUser.role === 'editor'" href="/admin"
-              class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:border-slate-300 hover:bg-slate-50 transition-colors">
+              class="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:border-slate-300 hover:bg-slate-50 transition-colors">
               <svg class="size-3.5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 stroke-width="2">
                 <rect width="7" height="9" x="3" y="3" rx="1" />
@@ -347,15 +361,109 @@ onBeforeUnmount(() => {
               Quản trị
             </a>
 
-            <button @click="handleLogout"
-              class="rounded-lg p-2 text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition-colors"
-              title="Đăng xuất">
-              <svg class="size-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" x2="9" y1="12" y2="12" />
-              </svg>
-            </button>
+            <!-- User Avatar & Dropdown Menu (Theo phong cách VnExpress) -->
+            <div ref="userDropdownRef" class="relative">
+              <button @click.stop="toggleUserDropdown"
+                class="flex items-center gap-2 rounded-full border border-slate-200 bg-white p-1 pe-2.5 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50 focus:outline-none cursor-pointer">
+                <div class="relative size-8 shrink-0">
+                  <img v-if="currentUser.avatar_url || currentUser.avatar"
+                    :src="currentUser.avatar_url || currentUser.avatar" alt="Avatar"
+                    class="size-8 rounded-full object-cover border border-slate-200" />
+                  <div v-else
+                    class="flex size-8 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-sky-600 text-xs font-bold text-white">
+                    {{ currentUser.name?.slice(0, 1)?.toUpperCase() || 'U' }}
+                  </div>
+                </div>
+                <span class="max-w-[100px] truncate text-slate-800 hidden md:inline">{{ readerName }}</span>
+                <svg class="size-3.5 text-slate-400 transition-transform" :class="showUserDropdown ? 'rotate-180' : ''"
+                  viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+
+              <!-- Dropdown Box (Minh họa ảnh VnExpress) -->
+              <Transition
+                enter-active-class="transition duration-150 ease-out"
+                enter-from-class="transform scale-95 opacity-0"
+                enter-to-class="transform scale-100 opacity-100"
+                leave-active-class="transition duration-100 ease-in"
+                leave-from-class="transform scale-100 opacity-100"
+                leave-to-class="transform scale-95 opacity-0"
+              >
+                <div v-if="showUserDropdown"
+                  class="absolute end-0 mt-2 w-64 rounded-2xl border border-slate-100 bg-white py-2 shadow-xl ring-1 ring-black/5 z-50">
+                  <!-- Header User Info -->
+                  <div class="flex items-center gap-3 px-4 py-3 border-b border-slate-100">
+                    <div class="size-11 shrink-0">
+                      <img v-if="currentUser.avatar_url || currentUser.avatar"
+                        :src="currentUser.avatar_url || currentUser.avatar" alt="Avatar"
+                        class="size-11 rounded-full object-cover border border-slate-200" />
+                      <div v-else
+                        class="flex size-11 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-sky-600 text-sm font-bold text-white shadow-xs">
+                        {{ currentUser.name?.slice(0, 1)?.toUpperCase() || 'U' }}
+                      </div>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                      <p class="truncate text-xs font-bold text-slate-900">{{ currentUser.name }}</p>
+                      <p class="truncate text-[11px] text-slate-400 font-mono">{{ currentUser.email }}</p>
+                    </div>
+                  </div>
+
+                  <!-- Menu Links -->
+                  <div class="py-1">
+                    <button @click="navigateTo('/profile')"
+                      class="flex w-full items-center gap-3 px-4 py-2.5 text-start text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-sky-600 transition cursor-pointer">
+                      <svg class="size-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
+                      </svg>
+                      <span>Thông tin chung</span>
+                    </button>
+
+                    <button @click="activeView = 'saved'; showUserDropdown = false"
+                      class="flex w-full items-center gap-3 px-4 py-2.5 text-start text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-sky-600 transition cursor-pointer">
+                      <svg class="size-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" />
+                      </svg>
+                      <span>Tin đã lưu ({{ savedIds.length }})</span>
+                    </button>
+
+                    <button @click="activeView = 'popular'; showUserDropdown = false"
+                      class="flex w-full items-center gap-3 px-4 py-2.5 text-start text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-sky-600 transition cursor-pointer">
+                      <svg class="size-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                      <span>Tin xem nhiều</span>
+                    </button>
+
+                    <a v-if="currentUser.role === 'admin' || currentUser.role === 'editor'" href="/admin"
+                      class="flex w-full items-center gap-3 px-4 py-2.5 text-start text-xs font-medium text-indigo-700 hover:bg-indigo-50 transition">
+                      <svg class="size-4 text-indigo-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect width="7" height="9" x="3" y="3" rx="1" />
+                        <rect width="7" height="5" x="14" y="3" rx="1" />
+                        <rect width="7" height="9" x="14" y="12" rx="1" />
+                        <rect width="7" height="5" x="3" y="16" rx="1" />
+                      </svg>
+                      <span>Trang Quản trị CMS</span>
+                    </a>
+                  </div>
+
+                  <!-- Footer Logout -->
+                  <div class="border-t border-slate-100 pt-1">
+                    <button @click="showUserDropdown = false; handleLogout()"
+                      class="flex w-full items-center gap-3 px-4 py-2.5 text-start text-xs font-semibold text-rose-600 hover:bg-rose-50 transition cursor-pointer">
+                      <svg class="size-4 text-rose-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                        <polyline points="16 17 21 12 16 7" />
+                        <line x1="21" y1="12" x2="9" y2="12" />
+                      </svg>
+                      <span>Thoát</span>
+                    </button>
+                  </div>
+                </div>
+              </Transition>
+            </div>
           </template>
 
           <template v-else>
@@ -960,15 +1068,18 @@ onBeforeUnmount(() => {
             Các bài viết đã lưu vẫn được giữ nguyên trên thiết bị này.
           </p>
           <div class="mt-5 flex items-center justify-center gap-3">
-            <button @click="showLogoutModal = false"
-              class="h-10 rounded-xl border border-slate-200 bg-white px-5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition">
+            <button @click="showLogoutModal = false" :disabled="isLoggingOut"
+              class="h-10 rounded-xl border border-slate-200 bg-white px-5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer">
               Ở lại
             </button>
-            <button @click="confirmLogout"
-              class="h-10 rounded-xl bg-rose-600 px-5 text-xs font-bold text-white shadow-md shadow-rose-600/25 hover:bg-rose-700 transition">
-              Đăng xuất
-            </button>
-          </div>
+            <button @click="confirmLogout" :disabled="isLoggingOut"
+              class="inline-flex items-center justify-center gap-2 h-10 min-w-[125px] rounded-xl bg-rose-600 px-5 text-xs font-bold text-white shadow-md shadow-rose-600/25 transition disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer hover:bg-rose-700 active:scale-98">
+              <svg v-if="isLoggingOut" class="size-4 animate-spin text-white" viewBox="0 0 24 24" fill="none">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+              </svg>
+              <span>{{ isLoggingOut ? 'Đang thoát...' : 'Đăng xuất' }}</span>
+            </button></div>
         </div>
       </div>
     </Transition>

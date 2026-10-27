@@ -7,10 +7,12 @@ defineProps({
     sections: {
         type: Array,
         default: () => [
-            { id: 'overview', label: 'Tổng quan' },
-            { id: 'articles', label: 'Bài báo' },
-            { id: 'categories', label: 'Danh mục' },
-            { id: 'users', label: 'Người dùng' },
+            { id: 'overview',    label: 'Tổng quan',   path: '/admin' },
+            { id: 'articles',   label: 'Bài báo',      path: '/admin/articles' },
+            { id: 'categories', label: 'Danh mục',     path: '/admin/categories' },
+            { id: 'sources',    label: 'Nguồn báo',    path: '/admin/sources' },
+            { id: 'voices',     label: 'Giọng nói', path: '/admin/voices' },
+            { id: 'users',      label: 'Người dùng',   path: '/admin/users' },
         ]
     },
     articlesCount: {
@@ -31,7 +33,7 @@ defineEmits(['select-section', 'logout'])
         class="fixed inset-y-0 start-0 z-30 hidden w-64 flex-col border-r border-slate-800/80 bg-slate-900 text-slate-300 lg:flex shadow-2xl">
         <!-- Brand Logo Header -->
         <div class="flex h-18 items-center justify-between border-b border-slate-800/80 px-5">
-            <a href="#overview" @click.prevent="$emit('select-section', 'overview')" class="group flex items-center gap-3">
+            <a href="/admin" @click.prevent="$emit('select-section', 'overview')" class="group flex items-center gap-3">
                 <img src="/logo/Khuon-Tron-removebg.png" alt="ReadVn"
                     class="size-10 rounded-xl bg-white p-1 shadow-md shadow-sky-500/20 transition group-hover:scale-105 shrink-0 object-contain" />
                 <div>
@@ -53,12 +55,15 @@ defineEmits(['select-section', 'logout'])
                 <p class="px-3 pb-2 text-[10px] font-bold tracking-wider text-slate-400 uppercase">Quản trị hệ thống
                 </p>
                 <nav class="space-y-1" aria-label="Điều hướng chính">
-                    <button v-for="section in sections" :key="section.id" :class="[
+                    <a v-for="section in sections" :key="section.id"
+                        :href="section.path"
+                        @click.prevent="$emit('select-section', section.id)"
+                        :class="[
                         'group flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-start text-xs font-semibold transition-all duration-150',
                         activeSection === section.id
                             ? 'bg-gradient-to-r from-sky-600 to-blue-700 text-white shadow-md shadow-sky-600/25 ring-1 ring-white/10'
                             : 'text-slate-400 hover:bg-slate-800/80 hover:text-white'
-                    ]" @click="$emit('select-section', section.id)">
+                    ]">
                         <!-- SVG Icons tương ứng từng section -->
                         <svg v-if="section.id === 'overview'" class="size-[18px] shrink-0" viewBox="0 0 24 24"
                             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -80,6 +85,20 @@ defineEmits(['select-section', 'logout'])
                             <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
                             <polyline points="9 22 9 12 15 12 15 22" />
                         </svg>
+                        <svg v-else-if="section.id === 'sources'" class="size-[18px] shrink-0" viewBox="0 0 24 24"
+                            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="2" y1="12" x2="22" y2="12" />
+                            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                        </svg>
+                        <svg v-else-if="section.id === 'voices'" class="size-[18px] shrink-0" viewBox="0 0 24 24"
+                            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                            <line x1="12" y1="19" x2="12" y2="22" />
+                        </svg>
                         <svg v-else class="size-[18px] shrink-0" viewBox="0 0 24 24" fill="none"
                             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
@@ -95,7 +114,7 @@ defineEmits(['select-section', 'logout'])
                         ]">
                             {{ articlesCount }}
                         </span>
-                    </button>
+                    </a>
                 </nav>
             </div>
 

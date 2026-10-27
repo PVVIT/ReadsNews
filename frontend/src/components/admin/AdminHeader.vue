@@ -18,6 +18,8 @@ defineProps({
             { id: 'overview', label: 'Tổng quan' },
             { id: 'articles', label: 'Bài báo' },
             { id: 'categories', label: 'Danh mục' },
+            { id: 'sources', label: 'Nguồn báo' },
+            { id: 'voices', label: 'Giọng nói' },
             { id: 'users', label: 'Người dùng' },
         ]
     },

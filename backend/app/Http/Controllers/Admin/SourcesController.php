@@ -7,26 +7,244 @@ use App\Models\Article;
 use App\Models\Source;
 use App\Services\ScraperService;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class SourcesController extends Controller
 {
     /**
      * GET /api/admin/sources
-     * Danh sách nguồn tin tức đang hoạt động.
+     * Danh sách nguồn tin tức (phân trang hoặc toàn bộ cho dropdown).
      */
-    public function index()
+    public function index(Request $request): JsonResponse
     {
-        $sources = Source::withCount('articles')
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->get();
+        $query = Source::query()
+            ->with('category:id,name,slug')
+            ->withCount('articles');
+
+        // Tìm kiếm theo tên, slug, website_url, rss_url
+        if ($request->filled('search')) {
+            $search = trim($request->input('search'));
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('slug', 'like', "%{$search}%")
+                  ->orWhere('website_url', 'like', "%{$search}%")
+                  ->orWhere('rss_url', 'like', "%{$search}%");
+            });
+        }
+
+        // Lọc theo danh mục mặc định
+        if ($request->filled('category_id') && $request->input('category_id') !== 'all') {
+            $query->where('category_id', $request->input('category_id'));
+        }
+
+        // Lọc theo trạng thái hoạt động
+        if ($request->filled('status') && $request->input('status') !== 'all') {
+            $isActive = filter_var($request->input('status'), FILTER_VALIDATE_BOOLEAN);
+            $query->where('is_active', $isActive);
+        }
+
+        // Lấy tất cả (phục vụ dropdown chọn nguồn tin của bài viết)
+        if ($request->boolean('all')) {
+            $sources = $query->orderBy('name', 'asc')->get();
+            return response()->json([
+                'success' => true,
+                'data'    => $sources,
+            ], 200);
+        }
+
+        $perPage = min((int) $request->input('per_page', 10), 100);
+        $page = max((int) $request->input('page', 1), 1);
+        $paginated = $query->orderBy('id', 'desc')->paginate($perPage, ['*'], 'page', $page);
+
+        $total = Source::count();
+        $activeCount = Source::where('is_active', true)->count();
 
         return response()->json([
             'success' => true,
-            'data'    => $sources,
+            'data'    => $paginated->items(),
+            'meta'    => [
+                'total'        => $paginated->total(),
+                'per_page'     => $paginated->perPage(),
+                'current_page' => $paginated->currentPage(),
+                'last_page'    => $paginated->lastPage(),
+                'active_count' => $activeCount,
+            ],
+        ], 200);
+    }
+
+    /**
+     * POST /api/admin/sources
+     * Thêm mới một nguồn báo.
+     */
+    public function store(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'name'        => 'required|string|max:100',
+            'slug'        => 'nullable|string|max:120|unique:sources,slug',
+            'website_url' => 'required|url|max:255',
+            'rss_url'     => 'nullable|url|max:500',
+            'category_id' => 'nullable|exists:categories,id',
+            'is_active'   => 'nullable|boolean',
+        ], [
+            'name.required'       => 'Tên nguồn báo không được để trống.',
+            'name.max'            => 'Tên nguồn báo tối đa 100 ký tự.',
+            'slug.unique'         => 'Đường dẫn (slug) nguồn báo đã tồn tại.',
+            'website_url.required'=> 'URL trang web không được để trống.',
+            'website_url.url'     => 'URL trang web không đúng định dạng URL.',
+            'rss_url.url'         => 'URL RSS Feed không đúng định dạng URL.',
+            'category_id.exists'  => 'Danh mục tin tức mặc định không tồn tại.',
         ]);
+
+        $slug = !empty($validated['slug']) ? Str::slug($validated['slug']) : Str::slug($validated['name']);
+        $originalSlug = $slug;
+        $counter = 1;
+        while (Source::where('slug', $slug)->exists()) {
+            $slug = "{$originalSlug}-{$counter}";
+            $counter++;
+        }
+
+        $source = Source::create([
+            'name'        => $validated['name'],
+            'slug'        => $slug,
+            'website_url' => $validated['website_url'],
+            'rss_url'     => $validated['rss_url'] ?? null,
+            'category_id' => $validated['category_id'] ?? null,
+            'is_active'   => $validated['is_active'] ?? true,
+        ]);
+
+        $source->load('category:id,name,slug');
+        $source->loadCount('articles');
+
+        return response()->json([
+            'success' => true,
+            'message' => "Đã tạo nguồn báo \"{$source->name}\" thành công!",
+            'data'    => $source,
+        ], 201);
+    }
+
+    /**
+     * GET /api/admin/sources/{id}
+     * Chi tiết một nguồn báo.
+     */
+    public function show(int $id): JsonResponse
+    {
+        $source = Source::with('category:id,name,slug')->withCount('articles')->findOrFail($id);
+
+        return response()->json([
+            'success' => true,
+            'data'    => $source,
+        ], 200);
+    }
+
+    /**
+     * PUT /api/admin/sources/{id}
+     * Cập nhật thông tin nguồn báo.
+     */
+    public function update(Request $request, int $id): JsonResponse
+    {
+        $source = Source::findOrFail($id);
+
+        $validated = $request->validate([
+            'name'        => 'required|string|max:100',
+            'slug'        => ['nullable', 'string', 'max:120', Rule::unique('sources', 'slug')->ignore($source->id)],
+            'website_url' => 'required|url|max:255',
+            'rss_url'     => 'nullable|url|max:500',
+            'category_id' => 'nullable|exists:categories,id',
+            'is_active'   => 'nullable|boolean',
+        ], [
+            'name.required'       => 'Tên nguồn báo không được để trống.',
+            'name.max'            => 'Tên nguồn báo tối đa 100 ký tự.',
+            'slug.unique'         => 'Đường dẫn (slug) nguồn báo đã tồn tại.',
+            'website_url.required'=> 'URL trang web không được để trống.',
+            'website_url.url'     => 'URL trang web không đúng định dạng URL.',
+            'rss_url.url'         => 'URL RSS Feed không đúng định dạng URL.',
+            'category_id.exists'  => 'Danh mục tin tức mặc định không tồn tại.',
+        ]);
+
+        $slug = !empty($validated['slug']) ? Str::slug($validated['slug']) : Str::slug($validated['name']);
+
+        $source->update([
+            'name'        => $validated['name'],
+            'slug'        => $slug,
+            'website_url' => $validated['website_url'],
+            'rss_url'     => $validated['rss_url'] ?? null,
+            'category_id' => $validated['category_id'] ?? null,
+            'is_active'   => $validated['is_active'] ?? $source->is_active,
+        ]);
+
+        $source->load('category:id,name,slug');
+        $source->loadCount('articles');
+
+        return response()->json([
+            'success' => true,
+            'message' => "Đã cập nhật nguồn báo \"{$source->name}\" thành công!",
+            'data'    => $source,
+        ], 200);
+    }
+
+    /**
+     * PATCH /api/admin/sources/{id}/toggle-status
+     * Bật / tắt trạng thái hoạt động của nguồn báo.
+     */
+    public function toggleStatus(int $id): JsonResponse
+    {
+        $source = Source::findOrFail($id);
+        $source->is_active = !$source->is_active;
+        $source->save();
+
+        $statusText = $source->is_active ? 'kích hoạt hoạt động' : 'vô hiệu hóa';
+
+        return response()->json([
+            'success' => true,
+            'message' => "Đã {$statusText} nguồn báo \"{$source->name}\".",
+            'data'    => [
+                'id'        => $source->id,
+                'is_active' => $source->is_active,
+            ],
+        ], 200);
+    }
+
+    /**
+     * DELETE /api/admin/sources/{id}
+     * Xóa một nguồn báo.
+     */
+    public function destroy(int $id): JsonResponse
+    {
+        $source = Source::findOrFail($id);
+        $sourceName = $source->name;
+
+        // Xóa nguồn báo (các bài viết liên quan sẽ có source_id = null do nullOnDelete)
+        $source->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => "Đã xóa nguồn báo \"{$sourceName}\" thành công.",
+        ], 200);
+    }
+
+    /**
+     * POST/DELETE /api/admin/sources/bulk-delete
+     * Xóa nhiều nguồn báo cùng lúc.
+     */
+    public function bulkDestroy(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'ids'   => 'required|array|min:1',
+            'ids.*' => 'integer',
+        ], [
+            'ids.required' => 'Vui lòng chọn ít nhất một nguồn báo để xóa.',
+        ]);
+
+        $deletedCount = Source::whereIn('id', $validated['ids'])->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => "Đã xóa thành công {$deletedCount} nguồn báo được chọn.",
+            'deleted' => $deletedCount,
+        ], 200);
     }
 
     /**
@@ -106,17 +324,14 @@ class SourcesController extends Controller
             }
 
             // ── Lấy mô tả và thumbnail từ <description> CDATA ────────────
-            // VnExpress RSS: description chứa CDATA với <a><img src="..."></a> + text
             $rawDescription = (string) ($item->description ?? '');
             $description    = '';
             $thumbnailFromDesc = null;
 
             if (!empty($rawDescription)) {
-                // Thử trích xuất URL ảnh từ thẻ <img> trong CDATA
                 if (preg_match('/<img[^>]+src=["\']([^"\']+)["\']/', $rawDescription, $imgMatch)) {
                     $thumbnailFromDesc = $imgMatch[1];
                 }
-                // Lấy text thuần (bỏ HTML tags)
                 $description = strip_tags($rawDescription);
                 $description = trim(preg_replace('/\s+/', ' ', $description));
             }
@@ -135,7 +350,6 @@ class SourcesController extends Controller
             $namespaces = array_merge($feed->getDocNamespaces(true) ?: [], $item->getNamespaces(true) ?: []);
 
             // ── Lấy tác giả từ Dublin Core namespace (dc:creator) ──────────
-            // VnExpress, Tuổi Trẻ và nhiều báo dùng <dc:creator>
             $author = null;
             if (isset($namespaces['dc'])) {
                 $dc        = $item->children($namespaces['dc']);
@@ -144,30 +358,25 @@ class SourcesController extends Controller
                     $author = $dcCreator;
                 }
             }
-            // Fallback: thử lấy từ <author> chuẩn RSS (Tuổi Trẻ dùng thẻ này)
             if (empty($author) && !empty((string) $item->author)) {
                 $rawAuthor = trim((string) $item->author);
-                // RSS <author> thường dạng "email (Tên)" — lấy phần tên trong ngoặc
                 if (preg_match('/\((.+?)\)/', $rawAuthor, $m)) {
                     $author = trim($m[1]);
                 } elseif (!str_contains($rawAuthor, '@')) {
-                    // Nếu không phải email thuần thì dùng luôn
                     $author = $rawAuthor;
                 }
             }
             if (!empty($author)) {
-                // Xoá ký tự ngôi sao, emoji nếu có (Tuổi Trẻ hay có ⭐)
                 $author = trim(preg_replace('/[\x{2B50}\x{2605}\x{2606}]/u', '', $author));
             }
 
             // ── Lấy nội dung đầy đủ từ content:encoded nếu có ─────────────
-            // Một số nguồn RSS cung cấp HTML đầy đủ trong <content:encoded>
             $fullContent = null;
             if (isset($namespaces['content'])) {
                 $contentNs = $item->children($namespaces['content']);
                 $encoded   = (string) ($contentNs->encoded ?? '');
                 if (!empty(trim(strip_tags($encoded)))) {
-                    $fullContent = trim($encoded); // Giữ nguyên HTML
+                    $fullContent = trim($encoded);
                 }
             }
 
@@ -179,7 +388,6 @@ class SourcesController extends Controller
                     $attrs     = $media->content->attributes();
                     $thumbnail = (string) ($attrs['url'] ?? '');
                 }
-                // Fallback: media:thumbnail
                 if (empty($thumbnail) && isset($media->thumbnail)) {
                     $attrs     = $media->thumbnail->attributes();
                     $thumbnail = (string) ($attrs['url'] ?? '');
@@ -189,7 +397,6 @@ class SourcesController extends Controller
                 $encAttrs  = $item->enclosure->attributes();
                 $thumbnail = (string) ($encAttrs['url'] ?? '');
             }
-            // Fallback: lấy từ ảnh trong description CDATA nếu vẫn trống
             if (empty($thumbnail) && !empty($thumbnailFromDesc)) {
                 $thumbnail = $thumbnailFromDesc;
             }
@@ -202,7 +409,7 @@ class SourcesController extends Controller
                         $fullContent = $scraped;
                     }
                 } catch (\Exception $e) {
-                    // Bỏ qua lỗi kết nối riêng lẻ để không ngắt luồng crawl
+                    // Bỏ qua lỗi kết nối riêng lẻ
                 }
             }
 
@@ -215,7 +422,7 @@ class SourcesController extends Controller
                 $slug = $slug . '-' . time() . '-' . rand(100, 999);
             }
 
-            // Tính word_count hỗ trợ tiếng Việt UTF-8
+            // Tính word_count
             $textForWordCount = $fullContent ? strip_tags($fullContent) : $description;
             $wordCount = $textForWordCount ? count(preg_split('/\s+/u', trim($textForWordCount), -1, PREG_SPLIT_NO_EMPTY)) : 0;
 
@@ -251,11 +458,9 @@ class SourcesController extends Controller
 
     /**
      * Crawl bổ sung nội dung chi tiết và tác giả từ URL bài viết gốc.
-     * Hỗ trợ các nguồn báo phổ biến như VnExpress, Tuổi Trẻ.
      */
     protected function scrapeDetailFromUrl(string $url, ?string &$existingAuthor = null): ?string
     {
         return ScraperService::scrapeDetailFromUrl($url, $existingAuthor);
     }
 }
-
