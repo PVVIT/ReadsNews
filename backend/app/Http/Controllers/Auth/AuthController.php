@@ -128,7 +128,9 @@ class AuthController extends Controller
         $user = User::where('email', $request->email)->first();
 
         // Tạo token bằng Password broker (tự động lưu vào password_reset_tokens)
-        $token = Password::broker()->createToken($user);
+        /** @var \Illuminate\Auth\Passwords\PasswordBroker $passwordBroker */
+        $passwordBroker = Password::broker();
+        $token = $passwordBroker->createToken($user);
 
         $frontendUrl = rtrim(env('FRONTEND_URL', 'http://localhost:5173'), '/');
         $resetUrl = "{$frontendUrl}/reset-password?token={$token}&email=" . urlencode($user->email);

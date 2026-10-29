@@ -72,5 +72,23 @@ export const articleService = {
     const response = await apiClient.post('/admin/articles/bulk-delete', { ids })
     return response.data
   },
+
+  /**
+   * Lấy danh sách bài báo công khai cho độc giả (Trang chủ)
+   * @param {Object} params { search, category_id, category_slug, sort, per_page, page }
+   */
+  async getPublicArticles(params = {}) {
+    const response = await apiClient.get('/articles', { params })
+    return response.data
+  },
+
+  /**
+   * Lấy chi tiết bài báo công khai
+   * @param {number|string} id
+   */
+  async getPublicArticle(id) {
+    const response = await apiClient.get(`/articles/${id}`)
+    return response.data
+  },
 }
 

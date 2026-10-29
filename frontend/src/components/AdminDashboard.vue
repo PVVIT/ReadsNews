@@ -24,12 +24,12 @@ import DeleteConfirmModal from './admin/DeleteConfirmModal.vue'
 import FlashToast from './admin/FlashToast.vue'
 
 const sections = [
-    { id: 'overview',    label: 'Tổng quan',    path: '/admin' },
-    { id: 'articles',   label: 'Bài báo',       path: '/admin/articles' },
-    { id: 'categories', label: 'Danh mục',      path: '/admin/categories' },
-    { id: 'sources',    label: 'Nguồn báo',     path: '/admin/sources' },
-    { id: 'voices',     label: 'Giọng nói',  path: '/admin/voices' },
-    { id: 'users',      label: 'Người dùng',    path: '/admin/users' },
+    { id: 'overview', label: 'Tổng quan', path: '/admin' },
+    { id: 'articles', label: 'Bài báo', path: '/admin/articles' },
+    { id: 'categories', label: 'Danh mục', path: '/admin/categories' },
+    { id: 'sources', label: 'Nguồn báo', path: '/admin/sources' },
+    { id: 'voices', label: 'Giọng nói', path: '/admin/voices' },
+    { id: 'users', label: 'Người dùng', path: '/admin/users' },
 ]
 
 // ─── Map URL path → section id ───────────────────────────────────────────────
@@ -1033,39 +1033,22 @@ function handlePopState() {
                     @change-page="fetchCategories($event)" />
 
                 <!-- SECTION 4: QUẢN LÝ NGUỒN BÁO (SOURCES) -->
-                <SourcesTable v-else-if="activeSection === 'sources'"
-                    :sources="adminSources"
-                    :categories="allCategories.length ? allCategories : categories"
-                    :is-loading="isAdminSourcesLoading"
-                    :crawling-source-id="crawlSourceId"
-                    :meta="adminSourcesMeta"
-                    v-model:search="search"
-                    v-model:filter-category="filterSourceCategory"
-                    v-model:filter-status="filterSourceStatus"
-                    v-model:selected-sources="selectedSources"
-                    @open-create-modal="openSourceForm(null)"
-                    @edit-source="openSourceForm($event)"
-                    @delete-source="askDelete('source', $event)"
-                    @crawl-source="handleCrawlRss($event)"
-                    @bulk-delete="askBulkDelete('sources')"
-                    @toggle-status="handleToggleSourceStatus"
-                    @change-page="fetchAdminSources($event)" />
+                <SourcesTable v-else-if="activeSection === 'sources'" :sources="adminSources"
+                    :categories="allCategories.length ? allCategories : categories" :is-loading="isAdminSourcesLoading"
+                    :crawling-source-id="crawlSourceId" :meta="adminSourcesMeta" v-model:search="search"
+                    v-model:filter-category="filterSourceCategory" v-model:filter-status="filterSourceStatus"
+                    v-model:selected-sources="selectedSources" @open-create-modal="openSourceForm(null)"
+                    @edit-source="openSourceForm($event)" @delete-source="askDelete('source', $event)"
+                    @crawl-source="handleCrawlRss($event)" @bulk-delete="askBulkDelete('sources')"
+                    @toggle-status="handleToggleSourceStatus" @change-page="fetchAdminSources($event)" />
 
                 <!-- SECTION 5: QUẢN LÝ GIỌNG NÓI AI (VOICES) -->
-                <VoicesTable v-else-if="activeSection === 'voices'"
-                    :voices="voices"
-                    :is-loading="isVoicesLoading"
-                    :meta="voicesMeta"
-                    v-model:search="search"
-                    v-model:filter-provider="filterVoiceProvider"
-                    v-model:filter-gender="filterVoiceGender"
-                    v-model:filter-status="filterVoiceStatus"
-                    v-model:selected-voices="selectedVoices"
-                    @open-create-modal="openVoiceForm(null)"
-                    @edit-voice="openVoiceForm($event)"
-                    @delete-voice="askDelete('voice', $event)"
-                    @bulk-delete="askBulkDelete('voices')"
-                    @toggle-status="handleToggleVoiceStatus"
+                <VoicesTable v-else-if="activeSection === 'voices'" :voices="voices" :is-loading="isVoicesLoading"
+                    :meta="voicesMeta" v-model:search="search" v-model:filter-provider="filterVoiceProvider"
+                    v-model:filter-gender="filterVoiceGender" v-model:filter-status="filterVoiceStatus"
+                    v-model:selected-voices="selectedVoices" @open-create-modal="openVoiceForm(null)"
+                    @edit-voice="openVoiceForm($event)" @delete-voice="askDelete('voice', $event)"
+                    @bulk-delete="askBulkDelete('voices')" @toggle-status="handleToggleVoiceStatus"
                     @change-page="fetchVoices($event)" />
 
                 <!-- SECTION 6: QUẢN LÝ NGƯỜI DÙNG (USERS) -->
@@ -1087,20 +1070,12 @@ function handlePopState() {
             @submit="saveCategory" />
 
         <!-- MODAL THÊM / SỬA NGUỒN BÁO -->
-        <SourceFormModal
-            :is-open="sourceModal"
-            :form="sourceForm"
-            :editing-id="editingId"
-            :categories="allCategories.length ? allCategories : categories"
-            @close="sourceModal = false"
+        <SourceFormModal :is-open="sourceModal" :form="sourceForm" :editing-id="editingId"
+            :categories="allCategories.length ? allCategories : categories" @close="sourceModal = false"
             @submit="saveSource" />
 
         <!-- MODAL THÊM / SỬA GIỌNG NÓI AI -->
-        <VoiceFormModal
-            :is-open="voiceModal"
-            :form="voiceForm"
-            :editing-id="editingId"
-            @close="voiceModal = false"
+        <VoiceFormModal :is-open="voiceModal" :form="voiceForm" :editing-id="editingId" @close="voiceModal = false"
             @submit="saveVoice" />
 
         <!-- MODAL THÊM / SỬA BÀI BÁO -->

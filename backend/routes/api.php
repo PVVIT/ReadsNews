@@ -6,11 +6,15 @@ use App\Http\Controllers\Admin\SourcesController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\VoiceController;
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\HomeController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-// Public Categories (cho trang đọc tin tức)
-Route::get('/categories', [CategoriesController::class, 'index']);
+// Public Routes cho Trang chủ (Render toàn bộ các thành phần trang chủ & bài viết)
+Route::get('/home', [HomeController::class, 'index']);
+Route::get('/categories', [HomeController::class, 'categories']);
+Route::get('/articles', [HomeController::class, 'articles']);
+Route::get('/articles/{id}', [HomeController::class, 'show']);
 
 // Auth Routes
 Route::prefix('auth')->group(function () {

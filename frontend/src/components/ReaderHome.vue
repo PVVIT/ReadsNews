@@ -2,98 +2,36 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { auth } from '@/utils/auth'
 import { authService } from '@/services/authService'
+import { homeService } from '@/services/homeService'
 import { toast } from 'vue3-toastify'
+import ThreeBackground from './home/ThreeBackground.vue'
 
-const categories = ['Tất cả', 'Thời sự', 'Thế giới', 'Kinh doanh', 'Thể thao', 'Công nghệ', 'Đời sống']
+// --- State Dữ liệu thật ---
+const categories = ref([
+  { id: 'all', name: 'Trang chủ', slug: 'all' },
+])
+const homeData = ref(null)
+const filterArticles = ref([])
+const totalFilterArticles = ref(0)
+const currentFilterPage = ref(1)
+const hasMoreFilterPages = ref(false)
 
-const articles = [
-  {
-    id: 1,
-    category: 'Thời sự',
-    source: 'Nhịp sống Việt',
-    time: '12 phút trước',
-    minutes: 6,
-    author: 'Minh Anh',
-    views: 12540,
-    title: 'Những đô thị thông minh đang thay đổi cách chúng ta di chuyển hằng ngày',
-    summary: 'Từ mạng lưới xe buýt điện, tàu cao tốc đô thị đến các tuyến phố ưu tiên người đi bộ, nhiều thành phố đang mở ra phong cách sống xanh và tiện nghi hơn.',
-    aiSummary: '• Ưu tiên giao thông công cộng và kết nối xanh thay vì phát triển xe cá nhân.\n• Ứng dụng bản đồ dữ liệu thời gian thực giúp giảm 35% thời gian chờ đợi.\n• Thử nghiệm phố đi bộ và mở rộng vỉa hè nâng cao chất lượng không gian sống đô thị.',
-    image: '/images/home/city.png',
-    voice: 'Google WaveNet Nữ (vi-VN)',
-    body: 'Các đô thị lớn đang nhìn lại cách không gian đường phố được phân chia. Thay vì dành phần lớn diện tích cho phương tiện cá nhân, nhiều kế hoạch mới ưu tiên kết nối giao thông công cộng, lối đi bộ và không gian xanh.\n\nSự chuyển dịch này không diễn ra trong một sớm một chiều. Những thay đổi nhỏ như mở rộng vỉa hè, tổ chức lại điểm trung chuyển và bổ sung dữ liệu giao thông theo thời gian thực đang giúp người dân có thêm lựa chọn cho hành trình hằng ngày.\n\nGiới quy hoạch cho rằng thành công của các thử nghiệm sẽ phụ thuộc vào khả năng kết nối giữa khu dân cư, nơi làm việc và dịch vụ thiết yếu, mang đến trải nghiệm di chuyển liền mạch và bảo vệ môi trường.',
-  },
-  {
-    id: 2,
-    category: 'Công nghệ',
-    source: 'Dữ liệu Mở',
-    time: '35 phút trước',
-    minutes: 4,
-    author: 'Hoàng Long',
-    views: 9360,
-    title: 'Mô hình văn phòng linh hoạt kết hợp AI đang định hình lại ngày làm việc',
-    summary: 'Không gian làm việc mới tích hợp trợ lý AI, phòng tập trung yên tĩnh và lịch làm việc linh động đang tối ưu hóa năng suất cho nhân sự số.',
-    aiSummary: '• Doanh nghiệp chuyển đổi sang không gian làm việc phân vùng linh hoạt theo dự án.\n• Trợ lý AI hỗ trợ tự động hóa ghi chú cuộc họp và điều phối lịch làm việc.\n• Năng suất lao động tăng 28% khi nhân viên được chủ động chọn nhịp độ làm việc.',
-    image: '/images/home/office.png',
-    voice: 'Google WaveNet Nam (vi-VN)',
-    body: 'Nhiều tổ chức đang thiết kế lại văn phòng theo hướng linh hoạt hơn. Thay vì một chỗ ngồi cố định cho mọi nhân viên, không gian được chia theo nhu cầu: khu cộng tác, phòng tập trung và các điểm gặp nhanh.\n\nCách làm này đặt ra yêu cầu mới về công nghệ đặt chỗ, quyền riêng tư và thói quen phối hợp. Hiệu quả phụ thuộc nhiều vào quy ước làm việc rõ ràng, không chỉ vào thiết kế nội thất.',
-  },
-  {
-    id: 3,
-    category: 'Đời sống',
-    source: 'Tạp chí Cuối Tuần',
-    time: '1 giờ trước',
-    minutes: 5,
-    author: 'Thu Hà',
-    views: 7210,
-    title: 'Nghệ thuật ngắt nhịp: Một khoảng nghỉ ngắn giúp phục hồi năng lượng tư duy',
-    summary: 'Những phương pháp khoa học đơn giản để tạo điểm ngắt nhịp lý tưởng giữa lịch trình làm việc căng thẳng mà không làm gián đoạn hiệu suất.',
-    aiSummary: '• Áp dụng chu kỳ làm việc 50 phút tập trung kết hợp 10 phút thả lỏng mắt và vận động nhẹ.\n• Giảm 40% tình trạng kiệt sức kỹ thuật số (digital fatigue) khi rời màn hình định kỳ.\n• Duy trì năng lượng ổn định suốt cả ngày mà không cần lạm dụng caffeine.',
-    image: '/images/home/work.png',
-    voice: 'Google WaveNet Nữ (vi-VN)',
-    body: 'Những khoảng nghỉ ngắn giúp nhiều người lấy lại sự tập trung sau các phiên làm việc liên tục. Một vòng đi bộ, vài phút rời màn hình hoặc một cuộc trò chuyện ngắn đều có thể tạo điểm ngắt cần thiết.\n\nĐiều quan trọng là lựa chọn cách nghỉ phù hợp với công việc và duy trì lịch nghỉ như một phần bình thường của ngày làm việc.',
-  },
-  {
-    id: 4,
-    category: 'Kinh doanh',
-    source: 'Bản tin Thị trường',
-    time: '2 giờ trước',
-    minutes: 7,
-    author: 'Quốc Bảo',
-    views: 5120,
-    title: 'Xu hướng đầu tư công trình bền vững và bài toán tiết kiệm năng lượng dài hạn',
-    summary: 'Tiêu chuẩn xanh không còn là khẩu hiệu mà đang trở thành thước đo giá trị cốt lõi giúp các tập đoàn tối ưu hóa chi phí vận hành 20 năm tới.',
-    aiSummary: '• Tiêu chuẩn LEED & Lotus giúp giảm tới 30% hóa đơn tiền điện và nước của tòa nhà.\n• Nhu cầu thuê văn phòng xanh tăng mạnh từ các công ty đa quốc gia có cam kết ESG.\n• Bài toán hoàn vốn đầu tư công nghệ xanh rút ngắn xuống còn 4-6 năm.',
-    image: '/images/home/spaces.png',
-    voice: 'Google WaveNet Nam (vi-VN)',
-    body: 'Các chủ đầu tư đang quan tâm nhiều hơn đến hiệu suất năng lượng và chất lượng môi trường bên trong công trình. Những tiêu chuẩn thiết kế mới khuyến khích tận dụng ánh sáng tự nhiên, lựa chọn vật liệu bền vững và theo dõi mức tiêu thụ năng lượng.\n\nBài toán nằm ở việc cân bằng chi phí ban đầu với hiệu quả vận hành trong dài hạn.',
-  },
-  {
-    id: 5,
-    category: 'Thế giới',
-    source: 'Góc nhìn Toàn cầu',
-    time: '3 giờ trước',
-    minutes: 5,
-    author: 'Hải Yến',
-    views: 4380,
-    title: 'Các siêu đô thị ven biển ứng dụng AI dự báo để chủ động thích ứng biến đổi khí hậu',
-    summary: 'Mô hình học máy kết hợp mạng lưới cảm biến IoT đang giúp các thành phố ven biển phát cảnh báo sớm ngập lụt trước 48 giờ.',
-    aiSummary: '• Mạng lưới cảm biến vệ tinh & IoT cung cấp dữ liệu thủy triều và vũ lượng chính xác từng mét vuông.\n• Hệ thống đê kè thông minh tự động đóng mở giảm thiểu rủi ro cho khu dân cư trũng thấp.\n• Hợp tác chia sẻ dữ liệu khí hậu xuyên biên giới đạt cột mốc mới.',
-    image: '/images/home/city.png',
-    voice: 'Google WaveNet Nữ (vi-VN)',
-    body: 'Các đô thị ven biển đang cập nhật kế hoạch ứng phó với những đợt mưa lớn và triều cường. Dữ liệu thời tiết theo khu vực giúp cơ quan quản lý chủ động điều phối giao thông, vận hành hệ thống thoát nước và thông tin đến cư dân.\n\nCác chuyên gia nhấn mạnh rằng hạ tầng xanh và quy hoạch dài hạn cần song hành với cảnh báo sớm.',
-  },
-]
+const isLoading = ref(true)
+const isLoadingMore = ref(false)
 
-// Trạng thái ứng dụng
-const activeCategory = ref('Tất cả')
-const activeView = ref('latest') // 'latest' | 'popular' | 'saved'
+// Trạng thái bộ lọc
+const activeCategory = ref('all') // category_id or 'all'
+const activeCategoryName = ref('Trang chủ')
+const activeView = ref('home') // 'home' | 'latest' | 'popular' | 'saved' | 'category' | 'search'
 const searchQuery = ref('')
+const searchDebounceTimer = ref(null)
+
 const savedIds = ref(readSavedIds())
 const selectedArticle = ref(null)
 const notice = ref('')
 let noticeTimer = null
 
-// Trình phát âm thanh
+// --- Trình phát âm thanh SpeechSynthesis ---
 const playingId = ref(null)
 const activePlayingArticle = ref(null)
 const isPaused = ref(false)
@@ -101,9 +39,7 @@ const speechRate = ref(1)
 const playbackProgress = ref(0)
 let progressInterval = null
 
-const featuredArticle = articles[0]
-
-// User Auth info
+// --- User Auth & Header Dropdown ---
 const currentUser = computed(() => auth.getUser())
 const showUserDropdown = ref(false)
 const userDropdownRef = ref(null)
@@ -123,6 +59,7 @@ function navigateTo(path) {
   window.history.pushState(null, '', path)
   window.dispatchEvent(new PopStateEvent('popstate'))
 }
+
 const readerName = computed(() => {
   if (currentUser.value?.name) {
     return currentUser.value.name.split(' ').at(-1)
@@ -130,37 +67,202 @@ const readerName = computed(() => {
   return 'bạn đọc'
 })
 
-// Tiêu đề danh sách
-const feedTitle = computed(() => {
+// Ngày tháng & thời tiết hiển thị kiểu Báo Tuổi Trẻ
+const currentDateStr = computed(() => {
+  const now = new Date()
+  const days = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy']
+  const dayName = days[now.getDay()]
+  const date = now.getDate()
+  const month = now.getMonth() + 1
+  const year = now.getFullYear()
+  return `${dayName}, ngày ${date}-${month}-${year}`
+})
+
+// Chuẩn hóa bài viết từ DB API sang format frontend
+function normalizeArticle(item) {
+  if (!item) return null
+  const publishedDate = item.published_at ? new Date(item.published_at) : new Date(item.created_at || Date.now())
+  const diffMinutes = Math.max(1, Math.round((Date.now() - publishedDate.getTime()) / (1000 * 60)))
+  let timeStr = 'Vừa xong'
+  if (diffMinutes < 60) {
+    timeStr = `${diffMinutes} phút trước`
+  } else if (diffMinutes < 1440) {
+    timeStr = `${Math.floor(diffMinutes / 60)} giờ trước`
+  } else {
+    timeStr = `${Math.floor(diffMinutes / 1440)} ngày trước`
+  }
+
+  const wordCount = item.word_count || (item.content ? item.content.replace(/<[^>]*>/g, '').split(/\s+/).length : 300)
+  const minutes = Math.max(1, Math.ceil(wordCount / 180))
+
+  return {
+    ...item,
+    image: item.thumbnail || '/images/home/city.png',
+    categoryName: item.category?.name || 'Thời sự',
+    categorySlug: item.category?.slug || 'thoi-su',
+    sourceName: item.source?.name || 'Tuổi Trẻ',
+    time: timeStr,
+    minutes,
+    views: item.view_count || Math.floor(Math.random() * 2000 + 450),
+    body: item.content || item.summary || '',
+    cleanBody: (item.content || item.summary || '').replace(/<[^>]*>/g, ''),
+    aiSummary: item.ai_summary || item.summary || '',
+    commentsCount: Math.floor(Math.random() * 8 + 1),
+    voice: 'Trợ lý AI Tiếng Việt (vi-VN)',
+  }
+}
+
+// Gọi API lấy toàn bộ dữ liệu trang chủ
+async function loadHomeData() {
+  isLoading.value = true
+  try {
+    const res = await homeService.getHomeData()
+    if (res.success && res.data) {
+      const data = res.data
+
+      categories.value = [
+        { id: 'all', name: 'Trang chủ', slug: 'all' },
+        ...(data.categories || []).map((c) => ({
+          id: c.id,
+          name: c.name,
+          slug: c.slug,
+        })),
+      ]
+
+      homeData.value = {
+        hero: {
+          main: normalizeArticle(data.hero?.main),
+          sub: (data.hero?.sub || []).map(normalizeArticle),
+          trending: (data.hero?.trending || []).map(normalizeArticle),
+        },
+        category_sections: (data.category_sections || []).map((sec) => ({
+          category: sec.category,
+          main: normalizeArticle(sec.main),
+          items: (sec.items || []).map(normalizeArticle),
+        })),
+        popular: (data.popular || []).map(normalizeArticle),
+        total_articles: data.total_articles || 0,
+      }
+    }
+  } catch (error) {
+    console.error('Lỗi tải dữ liệu trang chủ:', error)
+    notify('Không thể kết nối đến máy chủ tin tức')
+  } finally {
+    isLoading.value = false
+  }
+}
+
+// Gọi API lấy danh sách bài viết khi chọn 1 chuyên mục hoặc tìm kiếm
+async function loadFilterArticles(page = 1, append = false) {
+  if (page === 1) {
+    isLoading.value = true
+  } else {
+    isLoadingMore.value = true
+  }
+
+  try {
+    const params = {
+      page,
+      per_page: 15,
+      sort: activeView.value === 'popular' ? 'popular' : 'latest',
+    }
+
+    if (activeCategory.value !== 'all') {
+      params.category_id = activeCategory.value
+    }
+
+    if (searchQuery.value.trim()) {
+      params.search = searchQuery.value.trim()
+    }
+
+    const res = await homeService.getArticles(params)
+    const rawArticles = res.data || []
+    const normalized = rawArticles.map(normalizeArticle)
+
+    if (append) {
+      filterArticles.value = [...filterArticles.value, ...normalized]
+    } else {
+      filterArticles.value = normalized
+    }
+
+    currentFilterPage.value = page
+    if (res.meta) {
+      totalFilterArticles.value = res.meta.total || normalized.length
+      hasMoreFilterPages.value = res.meta.current_page < res.meta.last_page
+    } else {
+      hasMoreFilterPages.value = normalized.length >= 15
+    }
+  } catch (error) {
+    console.error('Lỗi lọc bài viết:', error)
+  } finally {
+    isLoading.value = false
+    isLoadingMore.value = false
+  }
+}
+
+// Xử lý chuyển đổi danh mục
+function setCategory(cat) {
+  activeCategory.value = cat.id
+  activeCategoryName.value = cat.name
+
+  if (cat.id === 'all' && !searchQuery.value.trim() && activeView.value !== 'saved') {
+    activeView.value = 'home'
+    loadHomeData()
+  } else {
+    activeView.value = 'category'
+    loadFilterArticles(1)
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+// Tải thêm bài viết trang kế
+function loadMore() {
+  if (!isLoadingMore.value && hasMoreFilterPages.value) {
+    loadFilterArticles(currentFilterPage.value + 1, true)
+  }
+}
+
+// Đổi chế độ xem
+function setView(view) {
+  activeView.value = view
+  if (view === 'home') {
+    activeCategory.value = 'all'
+    activeCategoryName.value = 'Trang chủ'
+    searchQuery.value = ''
+    loadHomeData()
+  } else if (view === 'saved') {
+    // Chế độ xem bài viết đã lưu
+  } else {
+    loadFilterArticles(1)
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+// Debounce tìm kiếm
+watch(searchQuery, (val) => {
+  clearTimeout(searchDebounceTimer.value)
+  searchDebounceTimer.value = setTimeout(() => {
+    if (val.trim()) {
+      activeView.value = 'search'
+      loadFilterArticles(1)
+    } else if (activeCategory.value === 'all') {
+      activeView.value = 'home'
+      loadHomeData()
+    } else {
+      loadFilterArticles(1)
+    }
+  }, 400)
+})
+
+// Tiêu đề chế độ xem hiện tại
+const currentViewTitle = computed(() => {
   if (activeView.value === 'saved') return 'Bài viết đã lưu'
-  if (activeView.value === 'popular') return 'Được quan tâm nhất'
-  return activeCategory.value === 'Tất cả' ? 'Tin mới cập nhật' : `Chuyên mục: ${activeCategory.value}`
+  if (searchQuery.value.trim()) return `Kết quả tìm kiếm: "${searchQuery.value}"`
+  if (activeCategory.value !== 'all') return `Chuyên mục: ${activeCategoryName.value}`
+  return 'Danh sách tin tức'
 })
 
-// Lọc bài viết
-const filteredArticles = computed(() => {
-  let list = articles.filter((a) => a.id !== featuredArticle.id)
-
-  if (activeView.value === 'saved') {
-    list = articles.filter((a) => savedIds.value.includes(a.id))
-  }
-
-  if (activeCategory.value !== 'Tất cả') {
-    list = list.filter((a) => a.category === activeCategory.value)
-  }
-
-  const query = searchQuery.value.trim().toLocaleLowerCase('vi')
-  if (query) {
-    list = list.filter((a) => `${a.title} ${a.summary} ${a.source} ${a.author}`.toLocaleLowerCase('vi').includes(query))
-  }
-
-  if (activeView.value === 'popular') {
-    list = [...list].sort((a, b) => b.views - a.views)
-  }
-
-  return list
-})
-
+// LocalStorage lưu trữ bài viết
 function readSavedIds() {
   try {
     return JSON.parse(localStorage.getItem('readsnews_saved') || '[]')
@@ -178,6 +280,7 @@ watch(
 )
 
 function toggleSaved(article) {
+  if (!article) return
   if (savedIds.value.includes(article.id)) {
     savedIds.value = savedIds.value.filter((id) => id !== article.id)
     notify('Đã xóa khỏi danh sách lưu trữ')
@@ -185,11 +288,6 @@ function toggleSaved(article) {
     savedIds.value.push(article.id)
     notify('Đã lưu bài viết vào thư viện cá nhân ✨')
   }
-}
-
-function setCategory(cat) {
-  activeCategory.value = cat
-  activeView.value = 'latest'
 }
 
 function notify(msg) {
@@ -200,13 +298,17 @@ function notify(msg) {
   }, 2800)
 }
 
-// Xử lý đọc văn bản SpeechSynthesis
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+// --- Xử lý đọc văn bản SpeechSynthesis ---
 function toggleSpeech(article) {
+  if (!article) return
   if (!('speechSynthesis' in window)) {
     return notify('Trình duyệt của bạn chưa hỗ trợ Web Speech API.')
   }
 
-  // Đang nghe bài này -> Bấm để tạm dừng hoặc tiếp tục
   if (playingId.value === article.id) {
     if (window.speechSynthesis.paused) {
       window.speechSynthesis.resume()
@@ -220,20 +322,19 @@ function toggleSpeech(article) {
     return
   }
 
-  // Chuyển sang đọc bài mới
   stopSpeech()
   activePlayingArticle.value = article
   playingId.value = article.id
   isPaused.value = false
   playbackProgress.value = 5
 
-  const textToRead = `${article.title}. Tóm tắt. ${article.summary}. Nội dung chi tiết. ${article.body}`
+  const cleanBody = article.cleanBody || article.summary || ''
+  const textToRead = `${article.title}. Tóm tắt. ${article.summary || ''}. Nội dung chi tiết. ${cleanBody.slice(0, 1500)}`
   const utterance = new SpeechSynthesisUtterance(textToRead)
   utterance.lang = 'vi-VN'
   utterance.rate = speechRate.value
 
-  // Giả lập thanh tiến trình phát dựa theo độ dài bài
-  const estSeconds = Math.max(article.minutes * 60, 60)
+  const estSeconds = Math.max(article.minutes * 50, 45)
   const step = 100 / estSeconds
   progressInterval = setInterval(() => {
     if (!isPaused.value && playbackProgress.value < 96) {
@@ -253,7 +354,7 @@ function toggleSpeech(article) {
   }
 
   window.speechSynthesis.speak(utterance)
-  notify(`Đang phát: ${article.title}`)
+  notify(`Đang đọc: ${article.title.slice(0, 40)}...`)
 }
 
 function stopSpeech() {
@@ -269,13 +370,35 @@ function stopSpeech() {
 function changeSpeed(rate) {
   speechRate.value = rate
   if (playingId.value && activePlayingArticle.value) {
-    // Khởi động lại với tốc độ mới
     toggleSpeech(activePlayingArticle.value)
     toggleSpeech(activePlayingArticle.value)
   }
   notify(`Tốc độ đọc: ${rate}x`)
 }
 
+function playNextArticle() {
+  const list = activeView.value === 'home' && homeData.value?.hero?.sub ? homeData.value.hero.sub : filterArticles.value
+  if (!activePlayingArticle.value || list.length === 0) return
+  const currentIndex = list.findIndex((a) => a.id === activePlayingArticle.value.id)
+  if (currentIndex !== -1 && currentIndex + 1 < list.length) {
+    toggleSpeech(list[currentIndex + 1])
+  } else {
+    notify('Đã đến bài viết cuối cùng')
+  }
+}
+
+function playPrevArticle() {
+  const list = activeView.value === 'home' && homeData.value?.hero?.sub ? homeData.value.hero.sub : filterArticles.value
+  if (!activePlayingArticle.value || list.length === 0) return
+  const currentIndex = list.findIndex((a) => a.id === activePlayingArticle.value.id)
+  if (currentIndex > 0) {
+    toggleSpeech(list[currentIndex - 1])
+  } else {
+    notify('Đây là bài viết đầu tiên')
+  }
+}
+
+// Logout Modal
 const showLogoutModal = ref(false)
 const isLoggingOut = ref(false)
 
@@ -289,12 +412,10 @@ async function confirmLogout() {
   try {
     await authService.logout()
   } catch (e) {
-    // Không gián đoạn nếu network có lỗi
+    // Bỏ qua lỗi network
   }
   auth.clearAuth()
-  toast.success('Đã đăng xuất tài khoản thành công!', {
-    autoClose: 2000,
-  })
+  toast.success('Đã đăng xuất tài khoản thành công!', { autoClose: 2000 })
   setTimeout(() => {
     showLogoutModal.value = false
     window.location.href = '/'
@@ -303,85 +424,106 @@ async function confirmLogout() {
 
 onMounted(() => {
   window.addEventListener('click', closeUserDropdown)
+  loadHomeData()
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('click', closeUserDropdown)
   stopSpeech()
   clearTimeout(noticeTimer)
+  clearTimeout(searchDebounceTimer.value)
 })
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50 text-slate-800 font-sans selection:bg-indigo-500 selection:text-white">
-    <!-- 1. TOP NAVBAR -->
-    <header
-      class="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200/80 transition-all duration-200 shadow-xs">
-      <div class="mx-auto flex h-18 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+  <div class="relative min-h-screen bg-[#fcfcfd] text-slate-800 font-sans selection:bg-sky-500 selection:text-white overflow-x-hidden">
+    <!-- 3D Three.js Background (Nhẹ nhàng trên nền sáng) -->
+    <ThreeBackground :is-audio-playing="playingId !== null && !isPaused" />
 
-        <!-- Logo Thương Hiệu ReadVn -->
-        <a href="/" class="group flex shrink-0 items-center gap-3">
+    <!-- 1. TOP NAVBAR (Nền Trắng - Chữ Đen - Hover Xanh Da Trời Nhạt) -->
+    <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 transition-all shadow-2xs">
+      
+      <!-- Top Bar: Logo, Search, User -->
+      <div class="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+        
+        <!-- Logo ReadVn -->
+        <a href="/" @click.prevent="setView('home')" class="group flex shrink-0 items-center gap-3 cursor-pointer">
           <img
             src="/logo/Khuon-Ngang-removebg.png"
-            alt="ReadVn - Báo Đọc Tin Nhanh"
-            class="h-10 sm:h-11.5 w-auto object-contain transition-transform duration-200 group-hover:scale-102"
+            alt="ReadVn"
+            class="h-9 sm:h-10 w-auto object-contain transition-transform duration-200 group-hover:scale-102"
           />
         </a>
 
         <!-- Search Bar -->
         <div class="relative hidden sm:block max-w-md flex-1">
-          <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3 text-slate-400">
-            <svg class="size-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-              stroke-linecap="round" stroke-linejoin="round">
+          <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3.5 text-slate-400">
+            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="11" cy="11" r="8" />
               <path d="m21 21-4.3-4.3" />
             </svg>
           </div>
-          <input v-model="searchQuery" type="search"
-            class="w-full rounded-full border border-slate-200 bg-slate-100/70 py-2 ps-10 pe-11 text-sm text-slate-900 placeholder:text-slate-400 transition-all focus:border-indigo-500 focus:bg-white focus:outline-hidden focus:ring-3 focus:ring-indigo-500/15"
-            placeholder="Tìm kiếm tin tức, chủ đề AI..." />
-          <kbd
-            class="pointer-events-none absolute inset-y-0 end-0 my-auto me-2.5 flex h-5.5 items-center rounded-md border border-slate-300 bg-white px-1.5 text-[10px] font-semibold text-slate-400 shadow-2xs">
+          <input
+            v-model="searchQuery"
+            type="search"
+            class="w-full rounded-full border border-slate-300 bg-slate-50 py-1.5 ps-10 pe-11 text-sm text-slate-900 placeholder:text-slate-400 transition-all focus:border-sky-500 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-sky-500/20"
+            placeholder="Tìm kiếm tin tức, thời sự, công nghệ..."
+          />
+          <kbd class="pointer-events-none absolute inset-y-0 end-0 my-auto me-2.5 flex h-5 items-center rounded border border-slate-300 bg-white px-1.5 text-[10px] font-semibold text-slate-400">
             ⌘K
           </kbd>
         </div>
 
-        <!-- User Actions / Status -->
+        <!-- User Actions / Profile -->
         <div class="flex items-center gap-2.5 sm:gap-3">
           <template v-if="currentUser">
-            <a v-if="currentUser.role === 'admin' || currentUser.role === 'editor'" href="/admin"
-              class="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:border-slate-300 hover:bg-slate-50 transition-colors">
-              <svg class="size-3.5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                stroke-width="2">
+            <a
+              v-if="currentUser.role === 'admin' || currentUser.role === 'editor'"
+              href="/admin"
+              class="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:border-sky-300 hover:bg-sky-50 hover:text-sky-600 transition-all"
+            >
+              <svg class="size-3.5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect width="7" height="9" x="3" y="3" rx="1" />
                 <rect width="7" height="5" x="14" y="3" rx="1" />
                 <rect width="7" height="9" x="14" y="12" rx="1" />
                 <rect width="7" height="5" x="3" y="16" rx="1" />
               </svg>
-              Quản trị
+              Quản trị CMS
             </a>
 
-            <!-- User Avatar & Dropdown Menu (Theo phong cách VnExpress) -->
+            <!-- Avatar & Dropdown Menu -->
             <div ref="userDropdownRef" class="relative">
-              <button @click.stop="toggleUserDropdown"
-                class="flex items-center gap-2 rounded-full border border-slate-200 bg-white p-1 pe-2.5 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-slate-50 focus:outline-none cursor-pointer">
-                <div class="relative size-8 shrink-0">
-                  <img v-if="currentUser.avatar_url || currentUser.avatar"
-                    :src="currentUser.avatar_url || currentUser.avatar" alt="Avatar"
-                    class="size-8 rounded-full object-cover border border-slate-200" />
-                  <div v-else
-                    class="flex size-8 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-sky-600 text-xs font-bold text-white">
+              <button
+                @click.stop="toggleUserDropdown"
+                class="flex items-center gap-2 rounded-full border border-slate-200 bg-white p-1 pe-2.5 text-xs font-semibold text-slate-700 shadow-2xs transition hover:bg-sky-50 hover:text-sky-600 focus:outline-none cursor-pointer"
+              >
+                <div class="relative size-7 shrink-0">
+                  <img
+                    v-if="currentUser.avatar_url || currentUser.avatar"
+                    :src="currentUser.avatar_url || currentUser.avatar"
+                    alt="Avatar"
+                    class="size-7 rounded-full object-cover border border-slate-200"
+                  />
+                  <div
+                    v-else
+                    class="flex size-7 items-center justify-center rounded-full bg-gradient-to-br from-sky-500 to-blue-600 text-xs font-bold text-white shadow-2xs"
+                  >
                     {{ currentUser.name?.slice(0, 1)?.toUpperCase() || 'U' }}
                   </div>
                 </div>
                 <span class="max-w-[100px] truncate text-slate-800 hidden md:inline">{{ readerName }}</span>
-                <svg class="size-3.5 text-slate-400 transition-transform" :class="showUserDropdown ? 'rotate-180' : ''"
-                  viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <svg
+                  class="size-3.5 text-slate-400 transition-transform"
+                  :class="showUserDropdown ? 'rotate-180' : ''"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
                   <path d="m6 9 6 6 6-6" />
                 </svg>
               </button>
 
-              <!-- Dropdown Box (Minh họa ảnh VnExpress) -->
               <Transition
                 enter-active-class="transition duration-150 ease-out"
                 enter-from-class="transform scale-95 opacity-0"
@@ -390,16 +532,22 @@ onBeforeUnmount(() => {
                 leave-from-class="transform scale-100 opacity-100"
                 leave-to-class="transform scale-95 opacity-0"
               >
-                <div v-if="showUserDropdown"
-                  class="absolute end-0 mt-2 w-64 rounded-2xl border border-slate-100 bg-white py-2 shadow-xl ring-1 ring-black/5 z-50">
-                  <!-- Header User Info -->
+                <div
+                  v-if="showUserDropdown"
+                  class="absolute end-0 mt-2 w-64 rounded-2xl border border-slate-200 bg-white py-2 shadow-xl ring-1 ring-black/5 z-50"
+                >
                   <div class="flex items-center gap-3 px-4 py-3 border-b border-slate-100">
                     <div class="size-11 shrink-0">
-                      <img v-if="currentUser.avatar_url || currentUser.avatar"
-                        :src="currentUser.avatar_url || currentUser.avatar" alt="Avatar"
-                        class="size-11 rounded-full object-cover border border-slate-200" />
-                      <div v-else
-                        class="flex size-11 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-sky-600 text-sm font-bold text-white shadow-xs">
+                      <img
+                        v-if="currentUser.avatar_url || currentUser.avatar"
+                        :src="currentUser.avatar_url || currentUser.avatar"
+                        alt="Avatar"
+                        class="size-11 rounded-full object-cover border border-slate-200"
+                      />
+                      <div
+                        v-else
+                        class="flex size-11 items-center justify-center rounded-full bg-gradient-to-br from-sky-500 to-blue-600 text-sm font-bold text-white shadow-xs"
+                      >
                         {{ currentUser.name?.slice(0, 1)?.toUpperCase() || 'U' }}
                       </div>
                     </div>
@@ -409,10 +557,11 @@ onBeforeUnmount(() => {
                     </div>
                   </div>
 
-                  <!-- Menu Links -->
                   <div class="py-1">
-                    <button @click="navigateTo('/profile')"
-                      class="flex w-full items-center gap-3 px-4 py-2.5 text-start text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-sky-600 transition cursor-pointer">
+                    <button
+                      @click="navigateTo('/profile')"
+                      class="flex w-full items-center gap-3 px-4 py-2 text-start text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-600 transition cursor-pointer"
+                    >
                       <svg class="size-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
                         <circle cx="12" cy="7" r="4" />
@@ -420,26 +569,22 @@ onBeforeUnmount(() => {
                       <span>Thông tin chung</span>
                     </button>
 
-                    <button @click="activeView = 'saved'; showUserDropdown = false"
-                      class="flex w-full items-center gap-3 px-4 py-2.5 text-start text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-sky-600 transition cursor-pointer">
+                    <button
+                      @click="setView('saved'); showUserDropdown = false"
+                      class="flex w-full items-center gap-3 px-4 py-2 text-start text-xs font-medium text-slate-700 hover:bg-sky-50 hover:text-sky-600 transition cursor-pointer"
+                    >
                       <svg class="size-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" />
                       </svg>
                       <span>Tin đã lưu ({{ savedIds.length }})</span>
                     </button>
 
-                    <button @click="activeView = 'popular'; showUserDropdown = false"
-                      class="flex w-full items-center gap-3 px-4 py-2.5 text-start text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-sky-600 transition cursor-pointer">
-                      <svg class="size-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-                        <circle cx="12" cy="12" r="3" />
-                      </svg>
-                      <span>Tin xem nhiều</span>
-                    </button>
-
-                    <a v-if="currentUser.role === 'admin' || currentUser.role === 'editor'" href="/admin"
-                      class="flex w-full items-center gap-3 px-4 py-2.5 text-start text-xs font-medium text-indigo-700 hover:bg-indigo-50 transition">
-                      <svg class="size-4 text-indigo-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <a
+                      v-if="currentUser.role === 'admin' || currentUser.role === 'editor'"
+                      href="/admin"
+                      class="flex w-full items-center gap-3 px-4 py-2 text-start text-xs font-medium text-sky-700 hover:bg-sky-50 transition"
+                    >
+                      <svg class="size-4 text-sky-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <rect width="7" height="9" x="3" y="3" rx="1" />
                         <rect width="7" height="5" x="14" y="3" rx="1" />
                         <rect width="7" height="9" x="14" y="12" rx="1" />
@@ -449,14 +594,15 @@ onBeforeUnmount(() => {
                     </a>
                   </div>
 
-                  <!-- Footer Logout -->
                   <div class="border-t border-slate-100 pt-1">
-                    <button @click="showUserDropdown = false; handleLogout()"
-                      class="flex w-full items-center gap-3 px-4 py-2.5 text-start text-xs font-semibold text-rose-600 hover:bg-rose-50 transition cursor-pointer">
-                      <svg class="size-4 text-rose-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <button
+                      @click="handleLogout"
+                      class="flex w-full items-center gap-3 px-4 py-2 text-start text-xs font-semibold text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                    >
+                      <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                         <polyline points="16 17 21 12 16 7" />
-                        <line x1="21" y1="12" x2="9" y2="12" />
+                        <line x1="21" x2="9" y1="12" y2="12" />
                       </svg>
                       <span>Thoát</span>
                     </button>
@@ -467,665 +613,951 @@ onBeforeUnmount(() => {
           </template>
 
           <template v-else>
-            <a href="/signin"
-              class="rounded-lg px-3.5 py-2 text-xs sm:text-sm font-semibold text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors">
+            <a
+              href="/login"
+              class="inline-flex items-center gap-1.5 rounded-full border border-sky-400 bg-sky-500 px-4 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-sky-600 transition-all cursor-pointer"
+            >
               Đăng nhập
-            </a>
-            <a href="/signup"
-              class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-xs sm:text-sm font-semibold text-white shadow-xs shadow-indigo-600/30 hover:bg-indigo-500 transition-all hover:shadow-md hover:shadow-indigo-600/20 active:scale-97">
-              Tạo tài khoản
             </a>
           </template>
         </div>
       </div>
 
-      <!-- Categories & Sub-nav Pills -->
-      <div class="border-t border-slate-100 bg-white">
-        <div
-          class="mx-auto flex max-w-7xl items-center justify-between gap-3 overflow-x-auto px-4 py-2 sm:px-6 lg:px-8 no-scrollbar">
-
-          <!-- Category Selector -->
-          <div class="flex items-center gap-1.5 shrink-0">
-            <button v-for="cat in categories" :key="cat" @click="setCategory(cat)" :class="[
-              'rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all duration-200 shrink-0',
-              activeCategory === cat
-                ? 'bg-indigo-600 text-white shadow-xs shadow-indigo-600/25'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-            ]">
-              {{ cat }}
-            </button>
-          </div>
-
-          <!-- Feed Filter Modes -->
-          <div class="flex items-center gap-1.5 border-s border-slate-200 ps-3 shrink-0">
-            <button @click="activeView = 'latest'; activeCategory = 'Tất cả'" :class="[
-              'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors',
-              activeView === 'latest' ? 'bg-slate-100 font-semibold text-indigo-700' : 'text-slate-500 hover:text-slate-800'
-            ]">
-              <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10" />
-                <polyline points="12 6 12 12 16 14" />
-              </svg>
-              Mới nhất
-            </button>
-
-            <button @click="activeView = 'popular'; activeCategory = 'Tất cả'" :class="[
-              'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors',
-              activeView === 'popular' ? 'bg-slate-100 font-semibold text-indigo-700' : 'text-slate-500 hover:text-slate-800'
-            ]">
-              <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path
-                  d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 3z" />
-              </svg>
-              Nổi bật
-            </button>
-
-            <button @click="activeView = 'saved'; activeCategory = 'Tất cả'" :class="[
-              'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors',
-              activeView === 'saved' ? 'bg-slate-100 font-semibold text-indigo-700' : 'text-slate-500 hover:text-slate-800'
-            ]">
-              <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" />
-              </svg>
-              Đã lưu ({{ savedIds.length }})
-            </button>
-          </div>
-        </div>
+      <!-- Navigation Bar Danh Mục Ngang -->
+      <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 border-t border-slate-200">
+        <nav class="flex items-center space-x-1 sm:space-x-2 overflow-x-auto py-1.5 scrollbar-none">
+          <button
+            v-for="cat in categories"
+            :key="cat.id"
+            @click="setCategory(cat)"
+            class="shrink-0 px-3 py-1 rounded text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 uppercase tracking-wide"
+            :class="
+              activeCategory === cat.id && activeView !== 'saved'
+                ? 'text-sky-600 font-extrabold border-b-2 border-sky-500'
+                : 'text-slate-700 hover:text-sky-600 hover:bg-sky-50/80'
+            "
+          >
+            {{ cat.name }}
+          </button>
+        </nav>
       </div>
+
     </header>
 
-    <!-- 2. MAIN CONTAINER -->
-    <main class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <!-- 2. MAIN CONTENT -->
+    <main class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 space-y-10">
 
-      <!-- HERO SECTION: FEATURED ARTICLE & AI AUDIO BRIEFING -->
-      <section class="mb-12 grid gap-6 lg:grid-cols-12 items-stretch">
+      <!-- ======================================================== -->
+      <!-- CHẾ ĐỘ 1: TRANG CHỦ THEO PHONG CÁCH BÁO TUỔI TRẺ (Hình mẫu 2) -->
+      <!-- ======================================================== -->
+      <template v-if="activeView === 'home' && !searchQuery.trim()">
 
-        <!-- FEATURED HERO CARD (8 Cols) -->
-        <article
-          class="lg:col-span-8 group relative overflow-hidden rounded-3xl bg-slate-900 shadow-xl shadow-slate-900/10 min-h-[460px] flex flex-col justify-end transition-all duration-300">
-          <!-- Background Cover Image with Gradient Scrim -->
-          <img :src="featuredArticle.image" :alt="featuredArticle.title"
-            class="absolute inset-0 size-full object-cover object-center opacity-85 transition-transform duration-700 ease-out group-hover:scale-105" />
-          <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/70 to-transparent"></div>
-
-          <!-- Top Tag -->
-          <div class="absolute top-6 start-6 z-10 flex items-center gap-2">
-            <span
-              class="inline-flex items-center gap-1.5 rounded-full bg-indigo-600/90 px-3 py-1 text-xs font-bold text-white shadow-sm backdrop-blur-md">
-              <span class="size-1.5 rounded-full bg-amber-300 animate-ping"></span>
-              TIN NỔI BẬT HÔM NAY
-            </span>
-            <span
-              class="inline-flex items-center gap-1 rounded-full bg-white/20 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-md border border-white/20">
-              <svg class="size-3 text-indigo-300" viewBox="0 0 24 24" fill="currentColor">
-                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-              </svg>
-              Giọng AI WaveNet
-            </span>
-          </div>
-
-          <!-- Bottom Content Info -->
-          <div class="relative z-10 p-6 sm:p-9 max-w-3xl">
-            <div class="flex items-center gap-3 text-xs font-medium text-slate-300 mb-3">
-              <span class="text-indigo-400 font-semibold">{{ featuredArticle.category }}</span>
-              <span>•</span>
-              <span>{{ featuredArticle.source }}</span>
-              <span>•</span>
-              <span>{{ featuredArticle.time }}</span>
+        <!-- LOADING SKELETON -->
+        <div v-if="isLoading" class="space-y-6 animate-pulse">
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 bg-white p-6 border border-slate-200 rounded-lg">
+            <div class="lg:col-span-3 space-y-4">
+              <div class="h-4 bg-slate-200 rounded w-3/4"></div>
+              <div class="h-20 bg-slate-100 rounded"></div>
+              <div class="h-32 bg-slate-100 rounded"></div>
             </div>
-
-            <h1
-              class="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-white leading-snug drop-shadow-xs">
-              {{ featuredArticle.title }}
-            </h1>
-
-            <p class="mt-3 text-sm sm:text-base text-slate-300 line-clamp-2 leading-relaxed">
-              {{ featuredArticle.summary }}
-            </p>
-
-            <!-- Actions Bar -->
-            <div class="mt-6 flex flex-wrap items-center gap-3.5">
-              <!-- Play / Pause Speech Button -->
-              <button @click="toggleSpeech(featuredArticle)" :class="[
-                'inline-flex items-center gap-2.5 rounded-xl px-5 py-3 text-sm font-bold transition-all shadow-md active:scale-97 cursor-pointer',
-                playingId === featuredArticle.id && !isPaused
-                  ? 'bg-emerald-500 text-white shadow-emerald-500/30 ring-4 ring-emerald-500/20'
-                  : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30'
-              ]">
-                <!-- Play / Pause Icon -->
-                <svg v-if="playingId === featuredArticle.id && !isPaused" class="size-4.5" viewBox="0 0 24 24"
-                  fill="currentColor">
-                  <rect x="6" y="4" width="4" height="16" rx="1" />
-                  <rect x="14" y="4" width="4" height="16" rx="1" />
-                </svg>
-                <svg v-else class="size-4.5" viewBox="0 0 24 24" fill="currentColor">
-                  <polygon points="5 3 19 12 5 21 5 3" />
-                </svg>
-                <span>{{ playingId === featuredArticle.id && !isPaused ? 'Đang phát...' : 'Nghe bài viết' }}</span>
-                <span class="rounded bg-black/20 px-1.5 py-0.5 text-[11px] font-normal text-indigo-100">
-                  {{ featuredArticle.minutes }} phút
-                </span>
-              </button>
-
-              <!-- Read Article Detail -->
-              <button @click="selectedArticle = featuredArticle"
-                class="inline-flex items-center gap-2 rounded-xl bg-white/15 hover:bg-white/25 px-4 py-3 text-sm font-semibold text-white backdrop-blur-md border border-white/20 transition-colors cursor-pointer">
-                Đọc toàn bài
-                <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M5 12h14" />
-                  <path d="m12 5 7 7-7 7" />
-                </svg>
-              </button>
-
-              <!-- Bookmark Button -->
-              <button @click="toggleSaved(featuredArticle)" :class="[
-                'size-11 flex items-center justify-center rounded-xl border backdrop-blur-md transition-all cursor-pointer',
-                savedIds.includes(featuredArticle.id)
-                  ? 'bg-amber-400/90 border-amber-300 text-slate-950 shadow-md shadow-amber-400/20'
-                  : 'bg-white/10 hover:bg-white/20 border-white/20 text-white'
-              ]" :title="savedIds.includes(featuredArticle.id) ? 'Bỏ lưu' : 'Lưu bài'">
-                <svg class="size-5" viewBox="0 0 24 24"
-                  :fill="savedIds.includes(featuredArticle.id) ? 'currentColor' : 'none'" stroke="currentColor"
-                  stroke-width="2">
-                  <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" />
-                </svg>
-              </button>
+            <div class="lg:col-span-6 space-y-4">
+              <div class="h-64 bg-slate-200 rounded"></div>
+              <div class="h-28 bg-slate-100 rounded"></div>
+            </div>
+            <div class="lg:col-span-3 space-y-4">
+              <div class="h-44 bg-slate-200 rounded"></div>
+              <div class="h-44 bg-slate-200 rounded"></div>
             </div>
           </div>
-        </article>
+        </div>
 
-        <!-- AI AUDIO BRIEFING ASIDE (4 Cols) -->
-        <aside
-          class="lg:col-span-4 rounded-3xl border border-slate-200/90 bg-white p-6 shadow-sm flex flex-col justify-between">
-          <div>
-            <!-- Box Header -->
-            <div class="flex items-center justify-between pb-4 border-b border-slate-100">
-              <div class="flex items-center gap-2.5">
-                <div class="flex size-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
-                  <svg class="size-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                    <line x1="12" x2="12" y1="19" y2="22" />
-                  </svg>
+        <template v-else-if="homeData">
+          
+          <!-- KHỐI TIÊU ĐIỂM CHÍNH (CHUẨN BÁO TUỔI TRẺ: 3 CỘT KHÔNG CARD PHẲNG) -->
+          <section class="bg-white border border-slate-200 rounded-lg p-5 sm:p-6 shadow-2xs">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+              <!-- ============================================== -->
+              <!-- CỘT 1 (Trái - ~23%): Ngày tháng + Góc nhìn + List tin thời sự -->
+              <!-- ============================================== -->
+              <div class="lg:col-span-3 lg:border-e lg:border-slate-200 lg:pe-6 space-y-5">
+                
+                <!-- Ngày & Thời tiết -->
+                <div class="border-b border-slate-100 pb-3 text-xs text-slate-500 font-medium space-y-0.5">
+                  <p class="font-bold text-slate-700">{{ currentDateStr }}</p>
+                  <p class="flex items-center gap-1.5 text-slate-600">
+                    <span>TP. Hồ Chí Minh</span>
+                    <span class="text-sky-600 font-bold">25° - 35°C</span>
+                    <span>⛅</span>
+                  </p>
                 </div>
-                <div>
-                  <h2 class="text-sm font-bold text-slate-900 uppercase tracking-wider">Trạm Tin AI Audio</h2>
-                  <p class="text-xs text-slate-500">Giọng đọc tổng hợp thông minh</p>
+
+                <!-- Box Góc nhìn / Bình luận (Tác giả + Avatar tròn) -->
+                <div class="bg-slate-50/80 rounded-lg p-3 border border-slate-200/80 space-y-2">
+                  <div class="flex items-center gap-2.5">
+                    <img
+                      src="/images/home/work.png"
+                      alt="Avatar tác giả"
+                      class="size-8 rounded-full object-cover border border-slate-300"
+                    />
+                    <div class="min-w-0">
+                      <span class="text-[10px] uppercase font-bold text-sky-600 tracking-wider block">Góc nhìn</span>
+                      <p class="text-xs font-bold text-slate-800 truncate">Nguyễn Phước Thắng</p>
+                    </div>
+                  </div>
+                  <p
+                    @click="homeData.hero?.trending?.[0] && (selectedArticle = homeData.hero.trending[0])"
+                    class="text-xs text-slate-700 line-clamp-3 leading-relaxed hover:text-sky-600 cursor-pointer font-medium"
+                  >
+                    "Lắng nghe tin tức bằng giọng nói AI: Xu hướng tiếp cận thông tin thời đại số cho độc giả bận rộn..."
+                  </p>
                 </div>
+
+                <!-- Danh sách 5 tin vắn thời sự (Chỉ tiêu đề + số comment / thời gian) -->
+                <div class="space-y-3.5 pt-1">
+                  <div
+                    v-for="(item, idx) in homeData.hero?.trending?.slice(0, 5)"
+                    :key="item.id"
+                    class="group border-b border-slate-100 pb-2.5 last:border-b-0 last:pb-0 space-y-1"
+                  >
+                    <h4
+                      @click="selectedArticle = item"
+                      class="text-xs sm:text-[13px] font-semibold text-slate-800 leading-snug line-clamp-3 group-hover:text-sky-600 transition-colors cursor-pointer"
+                    >
+                      {{ item.title }}
+                      <span v-if="item.commentsCount" class="text-[11px] text-sky-600 font-mono inline-flex items-center gap-0.5 ms-1">
+                        💬{{ item.commentsCount }}
+                      </span>
+                    </h4>
+                  </div>
+                </div>
+
               </div>
 
-              <!-- Animated Soundwave EQ -->
-              <div class="flex items-end gap-1 h-5" aria-hidden="true">
-                <span :class="['w-1 rounded-full bg-indigo-500', playingId ? 'h-5 animate-pulse' : 'h-2']"></span>
-                <span :class="['w-1 rounded-full bg-indigo-600', playingId ? 'h-3 animate-bounce' : 'h-3']"></span>
-                <span :class="['w-1 rounded-full bg-violet-600', playingId ? 'h-5 animate-pulse' : 'h-4']"></span>
-                <span :class="['w-1 rounded-full bg-indigo-500', playingId ? 'h-4 animate-bounce' : 'h-2']"></span>
-              </div>
-            </div>
+              <!-- ============================================== -->
+              <!-- CỘT 2 (Giữa - ~54%): Tiêu điểm chính (ảnh to bên trái, chữ bên phải) + 3 tin ngang phía dưới -->
+              <!-- ============================================== -->
+              <div class="lg:col-span-6 lg:border-e lg:border-slate-200 lg:pe-6 space-y-6">
+                
+                <!-- Hàng trên: Tin tiêu điểm số 1 (Bố cục ngang ảnh trái, chữ phải chuẩn Tuổi Trẻ) -->
+                <div v-if="homeData.hero?.main" class="group space-y-3">
+                  <div class="grid grid-cols-1 sm:grid-cols-12 gap-4">
+                    
+                    <!-- Ảnh to bên trái -->
+                    <div class="sm:col-span-7 relative overflow-hidden rounded aspect-16/11 bg-slate-100">
+                      <img
+                        :src="homeData.hero.main.image"
+                        :alt="homeData.hero.main.title"
+                        class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-102 cursor-pointer"
+                        @click="selectedArticle = homeData.hero.main"
+                        @error="$event.target.src = '/images/home/city.png'"
+                      />
+                      <button
+                        @click.stop="toggleSpeech(homeData.hero.main)"
+                        class="absolute bottom-2.5 right-2.5 size-8 rounded-full bg-sky-500 hover:bg-sky-600 text-white flex items-center justify-center shadow-md transition-transform group-hover:scale-110 cursor-pointer"
+                        title="Nghe tin AI"
+                      >
+                        <svg v-if="playingId === homeData.hero.main.id && !isPaused" class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <rect x="6" y="4" width="4" height="16" />
+                          <rect x="14" y="4" width="4" height="16" />
+                        </svg>
+                        <svg v-else class="size-3.5 ps-0.5" viewBox="0 0 24 24" fill="currentColor">
+                          <polygon points="5 3 19 12 5 21 5 3" />
+                        </svg>
+                      </button>
+                    </div>
 
-            <!-- Voice Control Speed -->
-            <div class="mt-4 rounded-xl bg-slate-50 p-3.5 border border-slate-100">
-              <div class="flex items-center justify-between mb-2">
-                <span class="text-xs font-semibold text-slate-600">Tốc độ phát âm:</span>
-                <span class="text-xs font-bold text-indigo-600">{{ speechRate }}x</span>
-              </div>
-              <div class="grid grid-cols-4 gap-1.5">
-                <button v-for="rate in [0.8, 1.0, 1.25, 1.5]" :key="rate" @click="changeSpeed(rate)" :class="[
-                  'rounded-lg py-1.5 text-xs font-bold transition-all',
-                  speechRate === rate
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'bg-white text-slate-600 hover:bg-slate-200/70 border border-slate-200'
-                ]">
-                  {{ rate }}x
-                </button>
-              </div>
-            </div>
+                    <!-- Tiêu đề và tóm tắt bên phải -->
+                    <div class="sm:col-span-5 flex flex-col justify-between space-y-2">
+                      <div class="space-y-2">
+                        <h2
+                          @click="selectedArticle = homeData.hero.main"
+                          class="text-lg sm:text-xl font-bold text-slate-900 leading-snug hover:text-sky-600 transition-colors cursor-pointer"
+                        >
+                          {{ homeData.hero.main.title }}
+                          <span class="text-xs text-sky-600 font-mono ms-1">💬{{ homeData.hero.main.commentsCount }}</span>
+                        </h2>
 
-            <!-- Quick Listen Playlist -->
-            <div class="mt-5">
-              <div class="flex items-center justify-between mb-2.5">
-                <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Danh sách phát nhanh</span>
-                <span class="text-xs font-semibold text-indigo-600">3 bài hot</span>
+                        <p class="text-xs text-slate-600 line-clamp-4 leading-relaxed">
+                          {{ homeData.hero.main.summary }}
+                        </p>
+                      </div>
+
+                      <div class="flex items-center gap-2 text-[11px] text-slate-400 font-mono pt-2">
+                        <span class="text-sky-600 font-bold">{{ homeData.hero.main.sourceName }}</span>
+                        <span>•</span>
+                        <span>{{ homeData.hero.main.time }}</span>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+
+                <!-- Hàng dưới: 3 tin tiêu điểm phụ xếp ngang (3 cột đều nhau chuẩn Tuổi Trẻ) -->
+                <div class="border-t border-slate-200 pt-5">
+                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <article
+                      v-for="sub in homeData.hero?.sub?.slice(0, 3)"
+                      :key="sub.id"
+                      class="group flex flex-col justify-between space-y-2"
+                    >
+                      <div class="relative overflow-hidden rounded aspect-16/11 bg-slate-100">
+                        <img
+                          :src="sub.image"
+                          :alt="sub.title"
+                          class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-103 cursor-pointer"
+                          @click="selectedArticle = sub"
+                          @error="$event.target.src = '/images/home/city.png'"
+                        />
+                        <button
+                          @click.stop="toggleSpeech(sub)"
+                          class="absolute bottom-1.5 right-1.5 size-6 rounded-full bg-black/60 hover:bg-sky-500 text-white flex items-center justify-center transition cursor-pointer"
+                          title="Nghe"
+                        >
+                          <svg class="size-2.5 ps-0.5" viewBox="0 0 24 24" fill="currentColor">
+                            <polygon points="5 3 19 12 5 21 5 3" />
+                          </svg>
+                        </button>
+                      </div>
+
+                      <h3
+                        @click="selectedArticle = sub"
+                        class="text-xs sm:text-[13px] font-bold text-slate-900 leading-snug line-clamp-3 group-hover:text-sky-600 transition-colors cursor-pointer"
+                      >
+                        {{ sub.title }}
+                        <span v-if="sub.commentsCount" class="text-[10px] text-sky-600 font-mono ms-0.5">💬{{ sub.commentsCount }}</span>
+                      </h3>
+
+                      <span class="text-[10px] text-slate-400 font-mono block">
+                        {{ sub.time }}
+                      </span>
+                    </article>
+                  </div>
+                </div>
+
               </div>
 
-              <div class="space-y-2">
-                <div v-for="item in articles.slice(1, 4)" :key="item.id" @click="toggleSpeech(item)" :class="[
-                  'group flex items-center gap-3 rounded-xl p-2.5 border transition-all cursor-pointer',
-                  playingId === item.id
-                    ? 'border-indigo-400 bg-indigo-50/60 shadow-xs'
-                    : 'border-slate-100 bg-white hover:border-slate-200 hover:bg-slate-50/80'
-                ]">
-                  <div :class="[
-                    'size-9 shrink-0 rounded-lg flex items-center justify-center transition-colors',
-                    playingId === item.id
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-slate-100 text-slate-600 group-hover:bg-indigo-100 group-hover:text-indigo-600'
-                  ]">
-                    <svg v-if="playingId === item.id && !isPaused" class="size-4" viewBox="0 0 24 24"
-                      fill="currentColor">
-                      <rect x="6" y="4" width="4" height="16" rx="1" />
-                      <rect x="14" y="4" width="4" height="16" rx="1" />
+              <!-- ============================================== -->
+              <!-- CỘT 3 (Phải - ~23%): Banner quảng cáo / Chuyên đề sự kiện Tuổi Trẻ -->
+              <!-- ============================================== -->
+              <div class="lg:col-span-3 space-y-4">
+                
+                <!-- Banner 1: Đọc báo thông minh Voice AI -->
+                <div class="rounded border border-sky-200 bg-gradient-to-br from-sky-50 to-blue-50/70 p-4 space-y-3 text-center">
+                  <div class="size-10 rounded-full bg-sky-500 text-white mx-auto flex items-center justify-center shadow-sm">
+                    <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                      <line x1="12" y1="19" x2="12" y2="22" />
                     </svg>
-                    <svg v-else class="size-4" viewBox="0 0 24 24" fill="currentColor">
+                  </div>
+                  <h4 class="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                    Trợ Lý Đọc Báo Bằng Giọng Nói AI
+                  </h4>
+                  <p class="text-[11px] text-slate-600 leading-relaxed">
+                    Điều khiển rảnh tay: ra lệnh "Đọc tiếp", "Tạm dừng", "Bài tiếp theo" trực tiếp trên trình duyệt.
+                  </p>
+                  <button
+                    @click="homeData.hero?.main && toggleSpeech(homeData.hero.main)"
+                    class="w-full rounded bg-sky-500 hover:bg-sky-600 text-white text-xs font-bold py-1.5 transition cursor-pointer shadow-2xs"
+                  >
+                    Nghe thử tin tiêu điểm 🎧
+                  </button>
+                </div>
+
+                <!-- Banner 2: Chuyên mục Diễn đàn số -->
+                <div class="rounded border border-slate-200 bg-slate-50 p-4 space-y-2.5">
+                  <span class="text-[10px] font-bold uppercase tracking-wider text-sky-600">Diễn đàn độc giả</span>
+                  <h5 class="text-xs font-bold text-slate-800 leading-snug">
+                    Bạn đọc hiến kế: Ứng dụng công nghệ nâng cao trải nghiệm báo chí số
+                  </h5>
+                  <p class="text-[11px] text-slate-500">
+                    Gửi ý kiến đóng góp và bài viết của bạn về tòa soạn ReadsNews ngay hôm nay.
+                  </p>
+                  <button
+                    @click="navigateTo('/profile')"
+                    class="text-[11px] font-bold text-sky-600 hover:underline cursor-pointer"
+                  >
+                    Xem chi tiết →
+                  </button>
+                </div>
+
+              </div>
+
+            </div>
+          </section>
+
+          <!-- CÁC KHỐI CHUYÊN MỤC DƯỚI (Thời sự, Kinh tế, Công nghệ, Thể thao...) -->
+          <section
+            v-for="section in homeData.category_sections"
+            :key="section.category.id"
+            class="bg-white border border-slate-200 rounded-lg p-5 sm:p-6 space-y-5 shadow-2xs"
+          >
+            <!-- Header Chuyên Mục -->
+            <div class="flex items-center justify-between border-b-2 border-sky-500 pb-2.5">
+              <div class="flex items-center gap-2">
+                <span class="h-4 w-1.5 bg-sky-500 rounded-full"></span>
+                <h3 class="text-base sm:text-lg font-bold uppercase tracking-wide text-slate-900">
+                  {{ section.category.name }}
+                </h3>
+              </div>
+
+              <button
+                @click="setCategory(section.category)"
+                class="text-xs font-bold text-sky-600 hover:text-sky-500 transition cursor-pointer flex items-center gap-1"
+              >
+                <span>Xem tất cả</span>
+                <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <path d="m9 18 6-6-6-6" />
+                </svg>
+              </button>
+            </div>
+
+            <!-- 1 Tin To Bên Trái + 4 Tin Ngang Bên Phải -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              
+              <!-- Tin to bên trái -->
+              <div v-if="section.main" class="lg:col-span-6 flex flex-col justify-between group space-y-3">
+                <div class="relative overflow-hidden rounded aspect-16/10 bg-slate-100">
+                  <img
+                    :src="section.main.image"
+                    :alt="section.main.title"
+                    class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-102 cursor-pointer"
+                    @click="selectedArticle = section.main"
+                    @error="$event.target.src = '/images/home/city.png'"
+                  />
+                  <button
+                    @click.stop="toggleSpeech(section.main)"
+                    class="absolute bottom-2.5 right-2.5 size-8 rounded-full bg-sky-500 hover:bg-sky-600 text-white flex items-center justify-center shadow-md transition-transform group-hover:scale-110 cursor-pointer"
+                  >
+                    <svg class="size-3.5 ps-0.5" viewBox="0 0 24 24" fill="currentColor">
                       <polygon points="5 3 19 12 5 21 5 3" />
                     </svg>
-                  </div>
-                  <div class="min-w-0 flex-1">
-                    <p
-                      class="text-xs font-semibold text-slate-900 truncate group-hover:text-indigo-600 transition-colors">
-                      {{ item.title }}
-                    </p>
-                    <p class="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1.5">
-                      <span>{{ item.category }}</span>
-                      <span>•</span>
-                      <span>{{ item.minutes }} phút</span>
-                    </p>
-                  </div>
+                  </button>
+                </div>
+
+                <div class="space-y-1.5">
+                  <h4
+                    @click="selectedArticle = section.main"
+                    class="text-base sm:text-lg font-bold text-slate-900 leading-snug group-hover:text-sky-600 transition-colors cursor-pointer"
+                  >
+                    {{ section.main.title }}
+                  </h4>
+                  <p class="text-xs text-slate-600 line-clamp-3 leading-relaxed">
+                    {{ section.main.summary }}
+                  </p>
+                </div>
+
+                <div class="flex items-center justify-between text-xs text-slate-400 font-mono pt-2 border-t border-slate-100">
+                  <span>{{ section.main.time }} • {{ section.main.minutes }} phút đọc</span>
+                  <button
+                    @click="selectedArticle = section.main"
+                    class="font-bold text-sky-600 hover:underline cursor-pointer"
+                  >
+                    Chi tiết →
+                  </button>
                 </div>
               </div>
+
+              <!-- 4 Tin phụ bên phải -->
+              <div class="lg:col-span-6 flex flex-col justify-between gap-3">
+                <article
+                  v-for="subItem in section.items"
+                  :key="subItem.id"
+                  class="group flex items-center gap-3 border-b border-slate-100 pb-2.5 last:border-b-0 last:pb-0"
+                >
+                  <img
+                    :src="subItem.image"
+                    :alt="subItem.title"
+                    class="size-20 rounded object-cover shrink-0 border border-slate-200 cursor-pointer"
+                    @click="selectedArticle = subItem"
+                    @error="$event.target.src = '/images/home/city.png'"
+                  />
+
+                  <div class="min-w-0 flex-1 space-y-1">
+                    <h5
+                      @click="selectedArticle = subItem"
+                      class="text-xs sm:text-sm font-bold text-slate-900 line-clamp-2 leading-snug group-hover:text-sky-600 transition cursor-pointer"
+                    >
+                      {{ subItem.title }}
+                    </h5>
+
+                    <div class="flex items-center gap-3 text-[11px] text-slate-400 font-mono">
+                      <span>{{ subItem.time }}</span>
+                      <button
+                        @click="toggleSpeech(subItem)"
+                        class="text-sky-600 hover:underline font-semibold cursor-pointer"
+                      >
+                        Nghe tin
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              </div>
+
             </div>
-          </div>
+          </section>
 
-          <!-- Bottom Helper Note -->
-          <div class="mt-6 pt-4 border-t border-slate-100 text-center">
-            <p class="text-xs text-slate-400">
-              Công nghệ chuyển văn bản thành giọng nói tiếng Việt
-            </p>
-          </div>
-        </aside>
-      </section>
-
-      <!-- 3. FEED SECTION: ARTICLE GRID -->
-      <section>
-        <!-- Section Header -->
-        <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
-          <div>
-            <h2 class="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-              <span>{{ feedTitle }}</span>
-              <span class="rounded-full bg-slate-200/70 px-2 py-0.5 text-xs font-bold text-slate-600">
-                {{ filteredArticles.length }}
-              </span>
-            </h2>
-            <p class="text-xs sm:text-sm text-slate-500 mt-1">
-              Tuyển tập những tin tức nổi bật được tối ưu cho cả đọc và nghe bằng AI
-            </p>
-          </div>
-        </div>
-
-        <!-- Articles Grid -->
-        <div v-if="filteredArticles.length" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          <article v-for="item in filteredArticles" :key="item.id"
-            class="group flex flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-xs transition-all duration-300 hover:-translate-y-1 hover:border-slate-300 hover:shadow-xl hover:shadow-slate-200/50">
-            <!-- Card Image Box -->
-            <div class="relative h-48 w-full overflow-hidden bg-slate-100">
-              <img :src="item.image" :alt="item.title"
-                class="size-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
-
-              <!-- Badges on Image -->
-              <span
-                class="absolute top-3 start-3 rounded-lg bg-white/95 px-2.5 py-1 text-xs font-bold text-indigo-700 shadow-sm backdrop-blur-xs">
-                {{ item.category }}
-              </span>
-
-              <!-- Quick Play Floating Button -->
-              <button @click="toggleSpeech(item)" :class="[
-                'absolute bottom-3 end-3 flex size-10 items-center justify-center rounded-full shadow-lg transition-transform active:scale-90 cursor-pointer',
-                playingId === item.id && !isPaused
-                  ? 'bg-emerald-500 text-white shadow-emerald-500/40'
-                  : 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-indigo-600/40'
-              ]" :title="playingId === item.id && !isPaused ? 'Tạm dừng' : 'Nghe bài này'">
-                <svg v-if="playingId === item.id && !isPaused" class="size-4" viewBox="0 0 24 24" fill="currentColor">
-                  <rect x="6" y="4" width="4" height="16" rx="1" />
-                  <rect x="14" y="4" width="4" height="16" rx="1" />
-                </svg>
-                <svg v-else class="size-4" viewBox="0 0 24 24" fill="currentColor">
-                  <polygon points="5 3 19 12 5 21 5 3" />
-                </svg>
-              </button>
-            </div>
-
-            <!-- Card Content Body -->
-            <div class="flex flex-1 flex-col justify-between p-5">
-              <div>
-                <div class="flex items-center justify-between text-xs font-medium text-slate-400 mb-2.5">
-                  <span class="text-indigo-600 font-semibold">{{ item.source }}</span>
-                  <span>{{ item.time }}</span>
-                </div>
-
-                <h3 @click="selectedArticle = item"
-                  class="text-base sm:text-lg font-bold text-slate-900 leading-snug line-clamp-2 hover:text-indigo-600 transition-colors cursor-pointer">
-                  {{ item.title }}
+          <!-- KHỐI TIN ĐỌC NHIỀU NHẤT (RANKING 01, 02, 03... TUỔI TRẺ STYLE) -->
+          <section v-if="homeData.popular && homeData.popular.length > 0" class="bg-white border border-slate-200 rounded-lg p-5 sm:p-6 space-y-5 shadow-2xs">
+            <div class="flex items-center justify-between border-b-2 border-sky-500 pb-2.5">
+              <div class="flex items-center gap-2">
+                <span class="h-4 w-1.5 bg-sky-500 rounded-full"></span>
+                <h3 class="text-base sm:text-lg font-bold uppercase tracking-wide text-slate-900">
+                  Đọc Nhiều Nhất
                 </h3>
-
-                <p class="mt-2 text-xs sm:text-sm text-slate-500 line-clamp-3 leading-relaxed">
-                  {{ item.summary }}
-                </p>
-              </div>
-
-              <!-- Card Footer -->
-              <div
-                class="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
-                <div class="flex items-center gap-1.5">
-                  <span class="font-medium text-slate-600">{{ item.author }}</span>
-                  <span>•</span>
-                  <span>{{ item.minutes }} phút đọc</span>
-                </div>
-
-                <div class="flex items-center gap-2">
-                  <button @click="toggleSaved(item)" :class="[
-                    'rounded-lg p-1.5 transition-colors cursor-pointer',
-                    savedIds.includes(item.id)
-                      ? 'text-amber-500 hover:text-amber-600 bg-amber-50'
-                      : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
-                  ]" :title="savedIds.includes(item.id) ? 'Bỏ lưu' : 'Lưu lại'">
-                    <svg class="size-4" viewBox="0 0 24 24" :fill="savedIds.includes(item.id) ? 'currentColor' : 'none'"
-                      stroke="currentColor" stroke-width="2">
-                      <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" />
-                    </svg>
-                  </button>
-
-                  <button @click="selectedArticle = item"
-                    class="rounded-lg p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer"
-                    title="Đọc toàn bài">
-                    <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M5 12h14" />
-                      <path d="m12 5 7 7-7 7" />
-                    </svg>
-                  </button>
-                </div>
               </div>
             </div>
-          </article>
-        </div>
 
-        <!-- Empty State -->
-        <div v-else class="rounded-3xl border border-dashed border-slate-300 bg-white p-12 text-center my-6">
-          <div class="mx-auto flex size-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 mb-4">
-            <svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.3-4.3" />
-            </svg>
-          </div>
-          <h3 class="text-base font-bold text-slate-900">Không tìm thấy bài viết phù hợp</h3>
-          <p class="mt-1 text-sm text-slate-500 max-w-sm mx-auto">
-            Thử tìm kiếm với từ khóa khác hoặc chuyển sang chuyên mục khác để tiếp tục đọc.
-          </p>
-          <button @click="searchQuery = ''; activeCategory = 'Tất cả'; activeView = 'latest'"
-            class="mt-5 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-indigo-500 transition-colors cursor-pointer">
-            Quay lại trang chủ
-          </button>
-        </div>
-      </section>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              <article
+                v-for="(pop, index) in homeData.popular"
+                :key="pop.id"
+                class="group flex items-start gap-3.5 p-3 rounded border border-slate-100 bg-slate-50/50 hover:bg-sky-50/30 hover:border-sky-200 transition"
+              >
+                <span class="text-2xl sm:text-3xl font-extrabold text-sky-400/40 group-hover:text-sky-500 transition-colors font-mono shrink-0">
+                  0{{ index + 1 }}
+                </span>
 
-      <!-- FOOTER -->
-      <footer
-        class="mt-20 border-t border-slate-200 pt-8 pb-16 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-        <div class="flex items-center gap-3">
-          <img src="/logo/Khuon-Tron-removebg.png" alt="ReadVn" class="size-8.5 object-contain" />
-          <div>
-            <div class="flex items-center gap-1.5 font-display text-xs sm:text-sm font-extrabold text-slate-900">
-              <span>Read<span class="text-orange-500">Vn</span></span>
-              <span class="rounded bg-sky-50 px-1.5 py-0.2 text-[9px] font-bold text-sky-600 ring-1 ring-sky-200">Báo Đọc – Tin Nhanh</span>
+                <div class="min-w-0 flex-1 space-y-1">
+                  <span class="text-[10px] text-sky-600 font-bold block">{{ pop.categoryName }}</span>
+                  <h4
+                    @click="selectedArticle = pop"
+                    class="text-xs sm:text-sm font-bold text-slate-900 line-clamp-2 leading-snug group-hover:text-sky-600 transition cursor-pointer"
+                  >
+                    {{ pop.title }}
+                  </h4>
+                </div>
+              </article>
             </div>
-            <p class="text-[11px] text-slate-400">Nền tảng đọc báo thông minh kết hợp giọng nói AI</p>
+          </section>
+
+        </template>
+      </template>
+
+      <!-- ======================================================== -->
+      <!-- CHẾ ĐỘ 2: DANH SÁCH BÀI BÁO (KHI LỌC CHUYÊN MỤC HOẶC TÌM KIẾM) -->
+      <!-- ======================================================== -->
+      <template v-else>
+        <section class="space-y-6">
+          
+          <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
+            <div class="flex items-center gap-3">
+              <div class="size-2 rounded-full bg-sky-500 animate-ping"></div>
+              <h2 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                {{ currentViewTitle }}
+              </h2>
+              <span class="rounded bg-sky-50 border border-sky-200 px-2.5 py-0.5 text-xs font-mono text-sky-700">
+                {{ totalFilterArticles }} bài báo
+              </span>
+            </div>
+
+            <button
+              @click="setView('home')"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded border border-slate-200 bg-white hover:bg-sky-50 hover:text-sky-600 hover:border-sky-300 text-xs font-bold text-slate-700 transition cursor-pointer"
+            >
+              ← Về trang chủ
+            </button>
           </div>
-        </div>
-        <div>
-          <span class="text-slate-400">Thiết kế tối ưu cho trải nghiệm người dùng & đồ án công nghệ</span>
-        </div>
-      </footer>
+
+          <div v-if="isLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div v-for="n in 6" :key="n" class="animate-pulse rounded border border-slate-200 bg-white p-4 space-y-4">
+              <div class="h-44 w-full bg-slate-100 rounded"></div>
+              <div class="h-4 w-1/3 bg-slate-100 rounded"></div>
+              <div class="h-6 w-full bg-slate-100 rounded"></div>
+            </div>
+          </div>
+
+          <div v-else-if="filterArticles.length === 0" class="text-center py-16 space-y-3 bg-white rounded border border-slate-200">
+            <div class="inline-flex size-14 items-center justify-center rounded-full bg-sky-50 border border-sky-200 text-sky-500 mb-2">
+              <svg class="size-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
+            </div>
+            <p class="text-lg font-semibold text-slate-800">Không tìm thấy bài viết nào</p>
+            <p class="text-sm text-slate-400">Hãy thử tìm từ khóa khác hoặc chuyển sang chuyên mục khác.</p>
+          </div>
+
+          <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <article
+              v-for="item in filterArticles"
+              :key="item.id"
+              class="group flex flex-col justify-between overflow-hidden rounded border border-slate-200 bg-white transition-all duration-200 hover:border-sky-300 hover:shadow-sm"
+            >
+              <div class="relative overflow-hidden aspect-16/10 bg-slate-100">
+                <img
+                  :src="item.image"
+                  :alt="item.title"
+                  class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-102"
+                  @error="$event.target.src = '/images/home/city.png'"
+                />
+                <span class="absolute top-2.5 left-2.5 rounded bg-white/90 border border-slate-200 px-2 py-0.5 text-[11px] font-semibold text-sky-700 backdrop-blur">
+                  {{ item.categoryName }}
+                </span>
+
+                <button
+                  @click.stop="toggleSpeech(item)"
+                  class="absolute bottom-2.5 right-2.5 size-9 rounded-full bg-sky-500 hover:bg-sky-600 text-white flex items-center justify-center shadow-md transition-transform group-hover:scale-110 cursor-pointer"
+                >
+                  <svg class="size-4 ps-0.5" viewBox="0 0 24 24" fill="currentColor">
+                    <polygon points="5 3 19 12 5 21 5 3" />
+                  </svg>
+                </button>
+              </div>
+
+              <div class="flex-1 p-4 flex flex-col justify-between space-y-2.5">
+                <div class="space-y-1.5">
+                  <div class="flex items-center gap-2 text-[11px] text-slate-400 font-mono">
+                    <span class="text-sky-600">{{ item.sourceName }}</span>
+                    <span>•</span>
+                    <span>{{ item.time }}</span>
+                  </div>
+
+                  <h4
+                    @click="selectedArticle = item"
+                    class="font-bold text-slate-900 text-sm leading-snug line-clamp-2 group-hover:text-sky-600 transition-colors cursor-pointer"
+                  >
+                    {{ item.title }}
+                  </h4>
+
+                  <p class="text-xs text-slate-500 line-clamp-2 leading-relaxed">
+                    {{ item.summary }}
+                  </p>
+                </div>
+
+                <div class="flex items-center justify-between pt-2.5 border-t border-slate-100 text-xs">
+                  <span class="text-slate-400 font-mono text-[11px]">{{ item.views }} lượt xem</span>
+
+                  <div class="flex items-center gap-2">
+                    <button
+                      @click="toggleSaved(item)"
+                      class="p-1 rounded text-slate-400 hover:text-sky-600 transition cursor-pointer"
+                    >
+                      <svg
+                        class="size-4"
+                        :fill="savedIds.includes(item.id) ? 'currentColor' : 'none'"
+                        :class="savedIds.includes(item.id) ? 'text-sky-500' : ''"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        stroke-width="2"
+                      >
+                        <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" />
+                      </svg>
+                    </button>
+
+                    <button
+                      @click="selectedArticle = item"
+                      class="font-semibold text-sky-600 hover:underline cursor-pointer"
+                    >
+                      Chi tiết →
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <div v-if="hasMoreFilterPages" class="text-center pt-6">
+            <button
+              @click="loadMore"
+              :disabled="isLoadingMore"
+              class="inline-flex items-center gap-2 rounded border border-slate-200 bg-white hover:bg-sky-50 hover:border-sky-300 text-slate-700 hover:text-sky-600 px-6 py-2 text-xs font-bold transition cursor-pointer disabled:opacity-50"
+            >
+              <svg v-if="isLoadingMore" class="animate-spin size-4 text-sky-500" viewBox="0 0 24 24" fill="none">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+              </svg>
+              <span>{{ isLoadingMore ? 'Đang tải thêm tin...' : 'Tải thêm bài viết' }}</span>
+            </button>
+          </div>
+
+        </section>
+      </template>
+
     </main>
 
-    <!-- 4. FLOATING DOCK AUDIO PLAYER (Hiển thị khi đang phát hoặc pause) -->
-    <Transition name="slide-up">
-      <div v-if="activePlayingArticle"
-        class="fixed bottom-4 inset-x-4 sm:inset-x-auto sm:end-8 sm:w-[480px] z-50 rounded-2xl border border-slate-200/90 bg-white/95 backdrop-blur-xl shadow-2xl p-4 transition-all">
-        <div class="flex items-center gap-3.5">
-          <!-- Thumbnail -->
-          <img :src="activePlayingArticle.image" :alt="activePlayingArticle.title"
-            class="size-13 rounded-xl object-cover shrink-0 shadow-xs border border-slate-200" />
+    <!-- 3. FOOTER BÁO CHÍ (Nền Trắng - Chữ Đen - Hover Xanh Da Trời Nhạt) -->
+    <footer class="mt-16 bg-white border-t border-slate-200 text-slate-700">
+      <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+        
+        <!-- Hàng 1: 5 Cột Danh Mục -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-6 text-xs sm:text-sm font-medium">
+          <div class="space-y-2.5">
+            <a href="#" @click.prevent="setView('home')" class="block text-slate-800 hover:text-sky-500 transition-colors">Chính trị</a>
+            <a href="#" @click.prevent="setView('home')" class="block text-slate-800 hover:text-sky-500 transition-colors">Thời sự</a>
+            <a href="#" @click.prevent="setView('home')" class="block text-slate-800 hover:text-sky-500 transition-colors">Thế giới</a>
+            <a href="#" @click.prevent="setView('home')" class="block text-slate-800 hover:text-sky-500 transition-colors">Kinh tế</a>
+          </div>
 
-          <!-- Title & Meta -->
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-1.5 text-[10px] font-semibold text-indigo-600">
-              <span class="size-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span>ĐANG PHÁT AI VOICE</span>
-              <span class="text-slate-400">•</span>
-              <span class="text-slate-500">{{ speechRate }}x</span>
-            </div>
-            <h4 class="text-xs font-bold text-slate-900 truncate mt-0.5">
-              {{ activePlayingArticle.title }}
-            </h4>
-            <p class="text-[11px] text-slate-400 truncate">
-              {{ activePlayingArticle.author }} · {{ activePlayingArticle.source }}
+          <div class="space-y-2.5">
+            <a href="#" @click.prevent="setView('home')" class="block text-slate-800 hover:text-sky-500 transition-colors">Đời sống</a>
+            <a href="#" @click.prevent="setView('home')" class="block text-slate-800 hover:text-sky-500 transition-colors">Sức khoẻ</a>
+            <a href="#" @click.prevent="setView('home')" class="block text-slate-800 hover:text-sky-500 transition-colors">Giới trẻ</a>
+            <a href="#" @click.prevent="setView('home')" class="block text-slate-800 hover:text-sky-500 transition-colors">Giáo dục</a>
+          </div>
+
+          <div class="space-y-2.5">
+            <a href="#" @click.prevent="setView('home')" class="block text-slate-800 hover:text-sky-500 transition-colors">Du lịch</a>
+            <a href="#" @click.prevent="setView('home')" class="block text-slate-800 hover:text-sky-500 transition-colors">Văn hoá</a>
+            <a href="#" @click.prevent="setView('home')" class="block text-slate-800 hover:text-sky-500 transition-colors">Giải trí</a>
+            <a href="#" @click.prevent="setView('home')" class="block text-slate-800 hover:text-sky-500 transition-colors">Thể thao</a>
+          </div>
+
+          <div class="space-y-2.5">
+            <a href="#" @click.prevent="setView('home')" class="block text-slate-800 hover:text-sky-500 transition-colors">Công nghệ</a>
+            <a href="#" @click.prevent="setView('home')" class="block text-slate-800 hover:text-sky-500 transition-colors">Xe</a>
+            <a href="#" @click.prevent="setView('home')" class="block text-slate-800 hover:text-sky-500 transition-colors">Thời trang trẻ</a>
+            <a href="#" @click.prevent="setView('home')" class="block text-slate-800 hover:text-sky-500 transition-colors">Video & Audio</a>
+          </div>
+
+          <div class="space-y-2.5">
+            <a href="#" @click.prevent="setView('home')" class="block text-slate-800 hover:text-sky-500 transition-colors">Bạn đọc</a>
+            <a href="#" @click.prevent="setView('home')" class="block text-slate-800 hover:text-sky-500 transition-colors">Rao vặt</a>
+            <a href="#" @click.prevent="setView('home')" class="block text-slate-800 hover:text-sky-500 transition-colors">Podcast AI</a>
+          </div>
+        </div>
+
+        <!-- Hàng 2: Logo + Menu Ngang + Mạng Xã Hội -->
+        <div class="pt-6 border-t border-slate-200 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div class="flex items-center gap-3">
+            <img
+              src="/logo/Khuon-Ngang-removebg.png"
+              alt="ReadVn"
+              class="h-8.5 w-auto object-contain"
+            />
+          </div>
+
+          <div class="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-xs sm:text-sm font-semibold text-slate-800">
+            <a href="#" @click.prevent class="hover:text-sky-500 transition-colors">Đặt báo</a>
+            <a href="#" @click.prevent class="hover:text-sky-500 transition-colors">Quảng cáo</a>
+            <a href="#" @click.prevent class="hover:text-sky-500 transition-colors">RSS</a>
+            <a href="#" @click.prevent class="hover:text-sky-500 transition-colors">Tòa soạn</a>
+            <a href="#" @click.prevent class="hover:text-sky-500 transition-colors">Chính sách bảo mật</a>
+          </div>
+
+          <div class="flex items-center gap-2.5 text-xs text-slate-600 font-medium">
+            <span>Theo dõi báo trên:</span>
+            <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" class="size-7 rounded-full border border-slate-300 flex items-center justify-center hover:border-sky-500 hover:bg-sky-50 hover:text-sky-600 transition-colors" title="Facebook">
+              <span class="font-bold text-[11px]">f</span>
+            </a>
+            <a href="https://zalo.me" target="_blank" rel="noopener noreferrer" class="size-7 rounded-full border border-slate-300 flex items-center justify-center hover:border-sky-500 hover:bg-sky-50 hover:text-sky-600 transition-colors" title="Zalo">
+              <span class="font-bold text-[9px]">Zalo</span>
+            </a>
+            <a href="https://youtube.com" target="_blank" rel="noopener noreferrer" class="size-7 rounded-full border border-slate-300 flex items-center justify-center hover:border-sky-500 hover:bg-sky-50 hover:text-sky-600 transition-colors" title="YouTube">
+              <span class="font-bold text-[9px]">▶</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Hàng 3: Tòa Soạn, Giấy Phép, Bản Quyền -->
+        <div class="pt-6 border-t border-slate-200 grid grid-cols-1 md:grid-cols-3 gap-6 text-[11px] sm:text-xs text-slate-500 leading-relaxed">
+          <div class="space-y-1.5">
+            <p><strong class="text-slate-700">Hotline:</strong> <span class="font-bold text-sky-600 ms-1">0906 645 777</span></p>
+            <p><strong class="text-slate-700">Liên hệ quảng cáo:</strong> <span class="font-bold text-sky-600 ms-1">0908 780 404</span></p>
+          </div>
+
+          <div class="space-y-1">
+            <p><strong class="text-slate-700">Tổng biên tập:</strong> Nguyễn Ngọc Toàn</p>
+            <p>Phó tổng biên tập thường trực: Hải Thành</p>
+            <p>Phó tổng biên tập: Lâm Hiếu Dũng</p>
+            <p>Tổng thư ký tòa soạn: Đức Trung</p>
+          </div>
+
+          <div class="space-y-2.5">
+            <p>
+              Giấy phép xuất bản số 110/GP - BTTTT cấp ngày 24.3.2020.
+              © 2003-2026 Bản quyền thuộc về ReadsNews. Cấm sao chép dưới mọi hình thức nếu không có sự chấp thuận bằng văn bản.
             </p>
-          </div>
-
-          <!-- Player Controls -->
-          <div class="flex items-center gap-1 shrink-0">
-            <!-- Play/Pause -->
-            <button @click="toggleSpeech(activePlayingArticle)"
-              class="flex size-10 items-center justify-center rounded-full bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30 transition-all active:scale-95 cursor-pointer">
-              <svg v-if="!isPaused" class="size-4.5" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="6" y="4" width="4" height="16" rx="1" />
-                <rect x="14" y="4" width="4" height="16" rx="1" />
-              </svg>
-              <svg v-else class="size-4.5" viewBox="0 0 24 24" fill="currentColor">
-                <polygon points="5 3 19 12 5 21 5 3" />
-              </svg>
-            </button>
-
-            <!-- Close Player -->
-            <button @click="stopSpeech"
-              class="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
-              title="Đóng trình phát">
-              <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
+            <div class="flex items-center gap-2">
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-900 text-white font-mono text-[10px] font-bold">
+                <span class="text-rose-500">★</span> NCSC CƠ BẢN
+              </span>
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-slate-300 text-[10px] text-slate-600 font-medium">
+                Tín Nhiệm Mạng
+              </span>
+            </div>
           </div>
         </div>
 
-        <!-- Mini Progress Bar -->
-        <div class="mt-3">
-          <div class="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-            <div class="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 transition-all duration-300 rounded-full"
-              :style="{ width: `${playbackProgress}%` }"></div>
-          </div>
-        </div>
       </div>
-    </Transition>
+    </footer>
 
-    <!-- 5. ARTICLE DETAIL MODAL (MODAL ĐỌC BÀI KÈM TÓM TẮT AI) -->
-    <Transition name="fade">
-      <div v-if="selectedArticle"
-        class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/70 p-4 sm:p-6 backdrop-blur-sm"
-        @click.self="selectedArticle = null">
-        <div
-          class="relative max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-white shadow-2xl transition-all">
+    <!-- Nút Cuộn Lên Đầu Trang -->
+    <button
+      @click="scrollToTop"
+      class="fixed bottom-24 right-5 z-40 size-10 rounded border border-slate-300 bg-white/95 text-slate-700 hover:text-sky-600 hover:border-sky-400 hover:bg-sky-50 shadow-sm flex flex-col items-center justify-center transition-all cursor-pointer group"
+      title="Lên đầu trang"
+    >
+      <svg class="size-3.5 group-hover:-translate-y-0.5 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="m18 15-6-6-6 6" />
+      </svg>
+      <span class="text-[8px] font-extrabold uppercase">TOP</span>
+    </button>
 
-          <!-- Close Button -->
-          <button @click="selectedArticle = null"
-            class="absolute top-4 end-4 z-20 flex size-9 items-center justify-center rounded-full bg-slate-900/60 hover:bg-slate-900 text-white backdrop-blur-md transition-colors cursor-pointer">
+    <!-- 4. ARTICLE DETAIL MODAL (Nền Trắng - Chữ Đen) -->
+    <div
+      v-if="selectedArticle"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs"
+      @click.self="selectedArticle = null"
+    >
+      <div class="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 sm:p-8 text-slate-800 shadow-2xl space-y-6">
+        
+        <button
+          @click="selectedArticle = null"
+          class="absolute top-5 right-5 p-2 rounded-full bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200 transition cursor-pointer"
+        >
+          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+
+        <div class="relative rounded overflow-hidden aspect-16/9 bg-slate-100">
+          <img
+            :src="selectedArticle.image"
+            :alt="selectedArticle.title"
+            class="w-full h-full object-cover"
+            @error="$event.target.src = '/images/home/city.png'"
+          />
+          <span class="absolute bottom-3 left-3 rounded bg-sky-500 px-2.5 py-1 text-xs font-bold text-white shadow">
+            {{ selectedArticle.categoryName }}
+          </span>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3 text-xs text-slate-500 font-mono">
+          <span class="font-bold text-sky-600">{{ selectedArticle.sourceName }}</span>
+          <span>•</span>
+          <span>Tác giả: <strong class="text-slate-700">{{ selectedArticle.author || 'Tổng hợp' }}</strong></span>
+          <span>•</span>
+          <span>{{ selectedArticle.time }}</span>
+          <span>•</span>
+          <span>{{ selectedArticle.minutes }} phút đọc</span>
+        </div>
+
+        <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 leading-tight">
+          {{ selectedArticle.title }}
+        </h2>
+
+        <div v-if="selectedArticle.aiSummary" class="rounded border border-sky-200 bg-sky-50/70 p-4 space-y-2">
+          <div class="flex items-center gap-2 text-xs font-bold text-sky-800">
+            <span class="size-2 rounded-full bg-sky-500 animate-ping"></span>
+            Tóm tắt thông minh (AI Summary)
+          </div>
+          <p class="text-xs sm:text-sm text-slate-700 whitespace-pre-line leading-relaxed">
+            {{ selectedArticle.aiSummary }}
+          </p>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded border border-slate-200 bg-slate-50">
+          <button
+            @click="toggleSpeech(selectedArticle)"
+            class="inline-flex items-center gap-2 rounded bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 text-xs font-bold shadow-sm transition cursor-pointer"
+          >
+            <svg v-if="playingId === selectedArticle.id && !isPaused" class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="6" y="4" width="4" height="16" />
+              <rect x="14" y="4" width="4" height="16" />
+            </svg>
+            <svg v-else class="size-4" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="5 3 19 12 5 21 5 3" />
+            </svg>
+            <span>{{ playingId === selectedArticle.id && !isPaused ? 'Đang đọc thành tiếng...' : 'Nghe bài viết với AI' }}</span>
+          </button>
+
+          <button
+            @click="toggleSaved(selectedArticle)"
+            class="inline-flex items-center gap-1.5 rounded border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:text-sky-600 transition cursor-pointer"
+          >
+            <svg
+              class="size-4"
+              :fill="savedIds.includes(selectedArticle.id) ? 'currentColor' : 'none'"
+              :class="savedIds.includes(selectedArticle.id) ? 'text-sky-500' : ''"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" />
+            </svg>
+            <span>{{ savedIds.includes(selectedArticle.id) ? 'Đã lưu' : 'Lưu bài' }}</span>
+          </button>
+        </div>
+
+        <div class="prose prose-slate max-w-none text-slate-700 text-sm sm:text-base leading-relaxed space-y-4">
+          <div v-if="selectedArticle.content" v-html="selectedArticle.content"></div>
+          <div v-else class="whitespace-pre-line">{{ selectedArticle.body }}</div>
+        </div>
+
+        <div class="pt-4 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
+          <a
+            v-if="selectedArticle.original_url"
+            :href="selectedArticle.original_url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-sky-600 hover:underline flex items-center gap-1"
+          >
+            Xem bài gốc trên {{ selectedArticle.sourceName }} ↗
+          </a>
+          <button
+            @click="selectedArticle = null"
+            class="px-4 py-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium cursor-pointer"
+          >
+            Đóng
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 5. PERSISTENT AUDIO PLAYER (Cố định ở đáy) -->
+    <div
+      v-if="activePlayingArticle"
+      class="fixed bottom-0 inset-x-0 z-40 bg-white/95 border-t border-slate-200 backdrop-blur-md shadow-2xl p-2.5 sm:p-3.5 text-slate-800"
+    >
+      <div class="mx-auto max-w-7xl flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
+        
+        <div class="flex items-center gap-3 w-full sm:w-auto min-w-0">
+          <img
+            :src="activePlayingArticle.image"
+            alt="Thumb"
+            class="size-10 sm:size-11 rounded object-cover border border-slate-200 shrink-0"
+          />
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2">
+              <span class="size-2 rounded-full bg-sky-500" :class="!isPaused ? 'animate-ping' : ''"></span>
+              <p class="truncate text-xs sm:text-sm font-bold text-slate-900">{{ activePlayingArticle.title }}</p>
+            </div>
+            <p class="text-[11px] text-sky-600 font-mono">{{ activePlayingArticle.sourceName }} • {{ activePlayingArticle.voice }}</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2.5 shrink-0">
+          <button
+            @click="playPrevArticle"
+            class="p-1.5 text-slate-500 hover:text-sky-600 hover:bg-sky-50 rounded transition cursor-pointer"
+            title="Bài trước"
+          >
+            <svg class="size-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="19 20 9 12 19 4 19 20" />
+              <line x1="5" y1="19" x2="5" y2="5" />
+            </svg>
+          </button>
+
+          <button
+            @click="toggleSpeech(activePlayingArticle)"
+            class="size-9 sm:size-10 rounded-full bg-sky-500 hover:bg-sky-600 text-white flex items-center justify-center shadow-md transition cursor-pointer"
+          >
+            <svg v-if="!isPaused" class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <rect x="6" y="4" width="4" height="16" />
+              <rect x="14" y="4" width="4" height="16" />
+            </svg>
+            <svg v-else class="size-4 ps-0.5" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="5 3 19 12 5 21 5 3" />
+            </svg>
+          </button>
+
+          <button
+            @click="playNextArticle"
+            class="p-1.5 text-slate-500 hover:text-sky-600 hover:bg-sky-50 rounded transition cursor-pointer"
+            title="Bài tiếp theo"
+          >
+            <svg class="size-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="5 4 15 12 5 20 5 4" />
+              <line x1="19" y1="5" x2="19" y2="19" />
+            </svg>
+          </button>
+
+          <div class="flex items-center gap-0.5 bg-slate-100 border border-slate-200 p-0.5 rounded text-[11px] font-mono">
+            <button
+              v-for="rate in [0.75, 1, 1.25, 1.5]"
+              :key="rate"
+              @click="changeSpeed(rate)"
+              class="px-1 py-0.5 rounded transition cursor-pointer"
+              :class="speechRate === rate ? 'bg-sky-500 text-white font-bold' : 'text-slate-600 hover:text-sky-600'"
+            >
+              {{ rate }}x
+            </button>
+          </div>
+
+          <button
+            @click="stopSpeech"
+            class="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded transition cursor-pointer"
+            title="Đóng trình phát"
+          >
             <svg class="size-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
-
-          <!-- Modal Cover Image -->
-          <div class="relative h-64 sm:h-80 w-full overflow-hidden bg-slate-900">
-            <img :src="selectedArticle.image" :alt="selectedArticle.title"
-              class="size-full object-cover object-center" />
-            <div class="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent"></div>
-
-            <div class="absolute bottom-4 start-6 text-white text-xs font-semibold flex items-center gap-2">
-              <span class="rounded-md bg-indigo-600 px-2.5 py-1">{{ selectedArticle.category }}</span>
-              <span>{{ selectedArticle.source }}</span>
-            </div>
-          </div>
-
-          <!-- Article Content Body -->
-          <div class="p-6 sm:p-10">
-            <div class="flex items-center gap-2 text-xs text-slate-400 mb-3">
-              <span>Tác giả: <strong class="text-slate-700">{{ selectedArticle.author }}</strong></span>
-              <span>•</span>
-              <span>{{ selectedArticle.time }}</span>
-              <span>•</span>
-              <span>{{ selectedArticle.minutes }} phút đọc</span>
-            </div>
-
-            <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900 leading-tight">
-              {{ selectedArticle.title }}
-            </h2>
-
-            <!-- AI Summary Box Spotlight -->
-            <div
-              class="mt-6 rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50/80 via-white to-violet-50/60 p-5 shadow-xs">
-              <div class="flex items-center justify-between mb-3">
-                <div class="flex items-center gap-2 text-indigo-700">
-                  <!-- Sparkles AI Icon -->
-                  <svg class="size-5" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 2l2.4 7.2L21.6 12l-7.2 2.4L12 21.6l-2.4-7.2L2.4 12l7.2-2.4L12 2z" />
-                  </svg>
-                  <span class="text-xs font-extrabold uppercase tracking-wider">Tóm tắt thông minh bởi AI</span>
-                </div>
-                <span class="text-[11px] font-semibold text-slate-400">Thời gian đọc ~30s</span>
-              </div>
-              <p class="whitespace-pre-line text-sm text-slate-700 leading-relaxed font-medium">
-                {{ selectedArticle.aiSummary }}
-              </p>
-            </div>
-
-            <!-- Listen Bar in Modal -->
-            <div
-              class="mt-6 flex flex-wrap items-center justify-between gap-3 p-4 rounded-xl bg-slate-50 border border-slate-100">
-              <div class="flex items-center gap-3">
-                <button @click="toggleSpeech(selectedArticle)"
-                  class="flex size-11 items-center justify-center rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/25 transition-transform active:scale-95 cursor-pointer">
-                  <svg v-if="playingId === selectedArticle.id && !isPaused" class="size-5" viewBox="0 0 24 24"
-                    fill="currentColor">
-                    <rect x="6" y="4" width="4" height="16" rx="1" />
-                    <rect x="14" y="4" width="4" height="16" rx="1" />
-                  </svg>
-                  <svg v-else class="size-5" viewBox="0 0 24 24" fill="currentColor">
-                    <polygon points="5 3 19 12 5 21 5 3" />
-                  </svg>
-                </button>
-                <div>
-                  <p class="text-xs font-bold text-slate-900">
-                    {{ playingId === selectedArticle.id && !isPaused ? 'Đang đọc thành tiếng...' : 'Nghe toàn bộ bài viết'
-                    }}
-                  </p>
-                  <p class="text-[11px] text-slate-500">{{ selectedArticle.voice }}</p>
-                </div>
-              </div>
-
-              <button @click="toggleSaved(selectedArticle)" :class="[
-                'inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold border transition-colors cursor-pointer',
-                savedIds.includes(selectedArticle.id)
-                  ? 'border-amber-300 bg-amber-50 text-amber-700'
-                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
-              ]">
-                <svg class="size-4" viewBox="0 0 24 24"
-                  :fill="savedIds.includes(selectedArticle.id) ? 'currentColor' : 'none'" stroke="currentColor"
-                  stroke-width="2">
-                  <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" />
-                </svg>
-                <span>{{ savedIds.includes(selectedArticle.id) ? 'Đã lưu' : 'Lưu bài' }}</span>
-              </button>
-            </div>
-
-            <!-- Full Article Body -->
-            <div class="mt-8 text-slate-700 leading-relaxed text-base sm:text-lg whitespace-pre-line space-y-4">
-              {{ selectedArticle.body }}
-            </div>
-          </div>
         </div>
-      </div>
-    </Transition>
 
-    <!-- 6. LOGOUT CONFIRM MODAL -->
-    <Transition name="fade">
-      <div v-if="showLogoutModal"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm"
-        @click.self="showLogoutModal = false">
-        <div class="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl border border-slate-100 text-center">
-          <div
-            class="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-rose-50 text-rose-500 ring-8 ring-rose-50/50">
-            <svg class="size-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-              stroke-linecap="round" stroke-linejoin="round">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-              <polyline points="16 17 21 12 16 7" />
-              <line x1="21" y1="12" x2="9" y2="12" />
-            </svg>
-          </div>
-          <h3 class="font-display text-lg font-extrabold text-slate-900">Đăng xuất tài khoản?</h3>
-          <p class="mt-1.5 text-xs leading-relaxed text-slate-500">
-            Bạn có chắc muốn đăng xuất khỏi ReadsNews không?<br />
-            Các bài viết đã lưu vẫn được giữ nguyên trên thiết bị này.
-          </p>
-          <div class="mt-5 flex items-center justify-center gap-3">
-            <button @click="showLogoutModal = false" :disabled="isLoggingOut"
-              class="h-10 rounded-xl border border-slate-200 bg-white px-5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition cursor-pointer">
-              Ở lại
-            </button>
-            <button @click="confirmLogout" :disabled="isLoggingOut"
-              class="inline-flex items-center justify-center gap-2 h-10 min-w-[125px] rounded-xl bg-rose-600 px-5 text-xs font-bold text-white shadow-md shadow-rose-600/25 transition disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer hover:bg-rose-700 active:scale-98">
-              <svg v-if="isLoggingOut" class="size-4 animate-spin text-white" viewBox="0 0 24 24" fill="none">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
-              </svg>
-              <span>{{ isLoggingOut ? 'Đang thoát...' : 'Đăng xuất' }}</span>
-            </button></div>
-        </div>
       </div>
-    </Transition>
 
-    <!-- 7. TOAST NOTIFICATION -->
-    <Transition name="fade">
-      <div v-if="notice"
-        class="fixed bottom-6 start-6 z-50 flex items-center gap-2.5 rounded-xl border border-indigo-200 bg-white px-4 py-3 text-xs sm:text-sm font-semibold text-slate-800 shadow-xl">
-        <span class="size-2 rounded-full bg-indigo-500 animate-ping"></span>
+      <div class="w-full bg-slate-200 h-1 mt-2 rounded-full overflow-hidden">
+        <div
+          class="bg-gradient-to-r from-sky-400 to-sky-600 h-full transition-all duration-300"
+          :style="{ width: `${playbackProgress}%` }"
+        ></div>
+      </div>
+    </div>
+
+    <!-- 6. TOAST NOTIFICATION -->
+    <Transition
+      enter-active-class="transition duration-200 ease-out"
+      enter-from-class="transform translate-y-4 opacity-0"
+      enter-to-class="transform translate-y-0 opacity-100"
+      leave-active-class="transition duration-150 ease-in"
+      leave-from-class="transform translate-y-0 opacity-100"
+      leave-to-class="transform translate-y-4 opacity-0"
+    >
+      <div
+        v-if="notice"
+        class="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 rounded-full border border-sky-200 bg-white px-5 py-2 text-xs font-semibold text-slate-800 shadow-xl flex items-center gap-2"
+      >
+        <span class="size-2 rounded-full bg-sky-500 animate-pulse"></span>
         <span>{{ notice }}</span>
       </div>
     </Transition>
+
+    <!-- 7. LOGOUT CONFIRMATION MODAL -->
+    <div
+      v-if="showLogoutModal"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs"
+      @click.self="!isLoggingOut && (showLogoutModal = false)"
+    >
+      <div class="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-6 text-center shadow-2xl space-y-4">
+        <div class="mx-auto flex size-12 items-center justify-center rounded-full bg-rose-50 text-rose-500 border border-rose-100">
+          <svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" x2="9" y1="12" y2="12" />
+          </svg>
+        </div>
+        <div class="space-y-1">
+          <h3 class="text-lg font-bold text-slate-900">Đăng xuất tài khoản?</h3>
+          <p class="text-xs text-slate-500">Bạn có chắc muốn đăng xuất khỏi ReadsNews không?</p>
+        </div>
+        <div class="flex items-center gap-3 pt-2">
+          <button
+            @click="showLogoutModal = false"
+            :disabled="isLoggingOut"
+            class="flex-1 rounded border border-slate-200 bg-slate-100 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200 transition cursor-pointer disabled:opacity-50"
+          >
+            Ở lại
+          </button>
+          <button
+            @click="confirmLogout"
+            :disabled="isLoggingOut"
+            class="flex-1 inline-flex items-center justify-center gap-2 rounded bg-rose-600 hover:bg-rose-500 py-2 text-xs font-bold text-white shadow-sm transition cursor-pointer disabled:opacity-50"
+          >
+            <svg v-if="isLoggingOut" class="animate-spin size-3.5 text-white" viewBox="0 0 24 24" fill="none">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+            </svg>
+            <span>{{ isLoggingOut ? 'Đang thoát...' : 'Đăng xuất' }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
-
-<style scoped>
-/* Smooth scroll and transitions */
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-/* Modal Transition */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.25s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-
-/* Floating Dock Slide Up */
-.slide-up-enter-active,
-.slide-up-leave-active {
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.slide-up-enter-from,
-.slide-up-leave-to {
-  opacity: 0;
-  transform: translateY(20px);
-}
-</style>
