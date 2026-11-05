@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/home', [HomeController::class, 'index']);
 Route::get('/categories', [HomeController::class, 'categories']);
 Route::get('/articles', [HomeController::class, 'articles']);
-Route::get('/articles/{id}', [HomeController::class, 'show']);
+Route::get('/articles/{id}', [HomeController::class, 'show'])->where('id', '[A-Za-z0-9\-\._]+');
 
 // Auth Routes
 Route::prefix('auth')->group(function () {
@@ -35,6 +35,14 @@ Route::middleware('auth:sanctum')->prefix('profile')->group(function () {
     Route::put('/', [\App\Http\Controllers\ProfileController::class, 'update']);
     Route::post('/avatar', [\App\Http\Controllers\ProfileController::class, 'updateAvatar']);
     Route::put('/password', [\App\Http\Controllers\ProfileController::class, 'changePassword']);
+});
+
+// Bookmark Routes (Lưu bài viết vào database theo tài khoản)
+Route::middleware('auth:sanctum')->prefix('bookmarks')->group(function () {
+    Route::get('/', [\App\Http\Controllers\BookmarkController::class, 'index']);
+    Route::get('/ids', [\App\Http\Controllers\BookmarkController::class, 'ids']);
+    Route::post('/{articleId}', [\App\Http\Controllers\BookmarkController::class, 'toggle']);
+    Route::delete('/{articleId}', [\App\Http\Controllers\BookmarkController::class, 'destroy']);
 });
 
 // Quản trị hệ thống (Admin & Editor)

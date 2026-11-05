@@ -159,14 +159,44 @@ class HomeController extends Controller
     }
 
     /**
-     * GET /api/articles/{id}
-     * Chi tiết bài báo + tăng lượt xem
+     * GET /api/articles/{idOrSlug}
+     * Chi tiết bài báo theo ID hoặc Slug (hỗ trợ .htm) + tăng lượt xem + tin liên quan
      */
-    public function show($id): JsonResponse
+    public function show($idOrSlug): JsonResponse
     {
-        $article = Article::with(['category:id,name,slug', 'source:id,name,slug'])
-            ->whereNotNull('published_at')
-            ->find($id);
+        $cleanParam = urldecode($idOrSlug);
+        // Bỏ đuôi .htm nếu có
+        $cleanParam = preg_replace('/\.htm$/i', '', $cleanParam);
+
+        $query = Article::with(['category:id,name,slug', 'source:id,name,slug'])
+            ->whereNotNull('published_at');
+
+        $article = null;
+
+        // 1. Nếu là số ID thuần
+        if (is_numeric($cleanParam)) {
+            $article = (clone $query)->where('id', $cleanParam)->first();
+        }
+
+        // 2. Nếu khớp chính xác slug
+        if (!$article) {
+            $article = (clone $query)->where('slug', $cleanParam)->first();
+        }
+
+        // 3. Nếu dạng {slug}-{id} (giống URL Tuổi Trẻ: tieu-de-bai-bao-12345)
+        if (!$article && preg_match('/^(.*)-(\d+)$/', $cleanParam, $matches)) {
+            $potentialId = $matches[2];
+            $potentialSlug = $matches[1];
+            $article = (clone $query)->where('id', $potentialId)->first();
+            if (!$article) {
+                $article = (clone $query)->where('slug', $potentialSlug)->first();
+            }
+        }
+
+        // 4. Tìm kiếm gần đúng theo slug nếu có tiền tố
+        if (!$article) {
+            $article = (clone $query)->where('slug', 'like', "{$cleanParam}%")->first();
+        }
 
         if (!$article) {
             return response()->json([
@@ -175,11 +205,31 @@ class HomeController extends Controller
             ], 404);
         }
 
+        // Tăng lượt xem
         $article->increment('view_count');
+
+        // Lấy tin liên quan cùng chuyên mục
+        $related = Article::with(['category:id,name,slug', 'source:id,name,slug'])
+            ->whereNotNull('published_at')
+            ->where('id', '!=', $article->id)
+            ->where('category_id', $article->category_id)
+            ->orderByDesc('published_at')
+            ->take(6)
+            ->get();
+
+        // Lấy tin đọc nhiều nhất
+        $popular = Article::with(['category:id,name,slug', 'source:id,name,slug'])
+            ->whereNotNull('published_at')
+            ->where('id', '!=', $article->id)
+            ->orderByDesc('view_count')
+            ->take(5)
+            ->get();
 
         return response()->json([
             'success' => true,
             'data' => $article,
+            'related' => $related,
+            'popular' => $popular,
         ]);
     }
 

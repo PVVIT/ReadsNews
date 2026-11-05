@@ -8,9 +8,28 @@ import Signup from './views/Auth/Signup.vue'
 import ForgotPassword from './views/Auth/ForgotPassword.vue'
 import ResetPassword from './views/Auth/ResetPassword.vue'
 import Profile from './views/Profile.vue'
+import ArticleDetail from './views/ArticleDetail.vue'
 
 // ─── Routing ────────────────────────────────────────────────────────────────
 const currentPath = ref(window.location.pathname.replace(/\/+$/, '') || '/')
+
+const articleSlug = computed(() => {
+  const path = currentPath.value.replace(/^\/+/, '').replace(/\/+$/, '')
+  if (!path) return null
+
+  // Khớp đuôi .htm giống Báo Tuổi Trẻ (ví dụ: tieu-de-bai-bao-123.htm)
+  if (path.endsWith('.htm')) {
+    return path
+  }
+
+  // Khớp tiền tố bài viết: /article/... hoặc /bai-viet/... hoặc /articles/...
+  if (path.startsWith('article/') || path.startsWith('bai-viet/') || path.startsWith('articles/')) {
+    const parts = path.split('/')
+    return parts[1] || null
+  }
+
+  return null
+})
 
 const updatePath = () => {
   currentPath.value = window.location.pathname.replace(/\/+$/, '') || '/'
@@ -114,6 +133,7 @@ const canAccessAdmin = computed(() => {
   <ForgotPassword v-else-if="currentPath === '/forgot-password' || currentPath === '/reset-password-request'" />
   <ResetPassword v-else-if="currentPath === '/reset-password'" />
   <Profile v-else-if="currentPath === '/profile'" />
+  <ArticleDetail v-else-if="articleSlug" :slug="articleSlug" />
   <ReaderHome v-else />
 </template>
 
